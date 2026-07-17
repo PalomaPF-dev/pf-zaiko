@@ -69,7 +69,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
               `${resetUrl}\n\n` +
               `パスワードを設定すると、社員番号とパスワードでログインできるようになります。\n` +
               `心当たりがない場合は、このメールを破棄してください。\n\n` +
-              `--\nPF在庫管理\nPF運営事務局\n`,
+              `--\nPF在庫管理\n`,
             // MAIL_REPLY_TO（設定時のみ）を既定の Reply-To として付与
             ...(process.env.MAIL_REPLY_TO?.trim() ? { reply_to: process.env.MAIL_REPLY_TO.trim() } : {}),
           }),
