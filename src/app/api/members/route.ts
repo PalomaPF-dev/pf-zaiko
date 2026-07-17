@@ -101,7 +101,7 @@ export async function POST(req: Request) {
       VALUES (${userId}, ${hashResetToken(token)},
               NOW() + make_interval(mins => ${INVITE_TOKEN_TTL_MINUTES}))`;
 
-    const base = (process.env.NEXTAUTH_URL || "https://sumakouba-zaiko.vercel.app").replace(/\/+$/, "");
+    const base = (process.env.NEXTAUTH_URL || "https://paloma-pf-zaiko.vercel.app").replace(/\/+$/, "");
     const inviteUrl = `${base}/password-reset/confirm?token=${token}`;
 
     // メールアドレスが入力されている場合のみ送信（無くても作成は成功させ、inviteUrl を必ず返す）
@@ -115,7 +115,7 @@ export async function POST(req: Request) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: process.env.CONTACT_FROM || "PF在庫管理 <noreply@sumakouba.com>",
+            from: process.env.CONTACT_FROM || "PF在庫管理 <noreply@paloma-pf.com>",
             to: [email],
             subject: "【PF在庫管理】アカウント発行のご案内",
             text:

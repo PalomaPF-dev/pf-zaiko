@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 
-const APP_URL = process.env.APP_URL || "https://sumakouba-zaiko.vercel.app";
+const APP_URL = process.env.APP_URL || "https://paloma-pf-zaiko.vercel.app";
 
 // ===== 安全在庫割れ アラートメール =====
 

@@ -1,6 +1,6 @@
 # Paloma品質 — App Store 申請手順・メタデータ
 
-シリーズ共通の Capacitor リモート読込方式（WebView で https://sumakouba-hinshitsu.vercel.app を表示）。
+シリーズ共通の Capacitor リモート読込方式（WebView で https://paloma-pf-hinshitsu.vercel.app を表示）。
 アンチステアリング対応（WebOnly: ネイティブでは価格/新規登録/外部課金リンク非表示）は実装済み。
 
 ---
@@ -12,13 +12,13 @@
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
 # プロジェクトを開く
-cd "/Users/tetsuya/Code Try/sumakouba-hinshitsu"
+cd "/Users/tetsuya/Code Try/paloma-pf-hinshitsu"
 npx cap open ios     # または open ios/App/App.xcodeproj
 ```
 
 Xcode での設定（初回のみ）:
 1. TARGETS → App → **Signing & Capabilities** → Team に Apple Developer アカウントを選択
-2. Bundle Identifier: `jp.sumakouba.hinshitsu`（設定済み）
+2. Bundle Identifier: `jp.paloma-pf.hinshitsu`（設定済み）
 3. General → Identity → Version `1.0` / Build `1`
 
 Archive → 提出:
@@ -33,8 +33,8 @@ Archive → 提出:
 | プラットフォーム | iOS |
 | 名前 | **Paloma品質** |
 | プライマリ言語 | 日本語 |
-| バンドルID | `jp.sumakouba.hinshitsu`（Identifiers に未登録なら App IDs で先に作成） |
-| SKU | `sumakouba-hinshitsu` |
+| バンドルID | `jp.paloma-pf.hinshitsu`（Identifiers に未登録なら App IDs で先に作成） |
+| SKU | `paloma-pf-hinshitsu` |
 | カテゴリ | ビジネス（サブ: 仕事効率化） |
 | 価格 | 無料（App内課金なし。Web側のプランは表示しない＝アンチステアリング対応済み） |
 
@@ -86,8 +86,8 @@ Paloma品質は、製造現場の品質チェックを「QC工程表のとおり
 
 | 項目 | 値 |
 | --- | --- |
-| サポートURL | https://www.sumakouba.com |
-| プライバシーポリシーURL | https://sumakouba-hinshitsu.vercel.app/privacy |
+| サポートURL | https://www.paloma-pf.com |
+| プライバシーポリシーURL | https://paloma-pf-hinshitsu.vercel.app/privacy |
 | Copyright | Paloma |
 
 ## 3. App プライバシー（データ収集）
@@ -134,7 +134,7 @@ xcrun simctl boot "iPhone 16 Pro Max"
 
 ## 6. 提出前チェックリスト
 
-- [ ] Xcode: Team 設定・Bundle ID `jp.sumakouba.hinshitsu`
+- [ ] Xcode: Team 設定・Bundle ID `jp.paloma-pf.hinshitsu`
 - [ ] Version/Build 番号
 - [ ] Archive → Upload 成功
 - [ ] App Store Connect: メタデータ・スクリーンショット・プライバシー入力

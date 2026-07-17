@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       const token = randomBytes(32).toString("hex");
       await storeResetToken(user.id, token);
 
-      const base = process.env.NEXTAUTH_URL || "https://sumakouba-zaiko.vercel.app";
+      const base = process.env.NEXTAUTH_URL || "https://paloma-pf-zaiko.vercel.app";
       const link = `${base.replace(/\/$/, "")}/password-reset/confirm?token=${token}`;
 
       if (process.env.RESEND_API_KEY) {
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              from: process.env.CONTACT_FROM || "PF在庫管理 <noreply@sumakouba.com>",
+              from: process.env.CONTACT_FROM || "PF在庫管理 <noreply@paloma-pf.com>",
               to: [email],
               subject: "【PF在庫管理】パスワード再設定のご案内",
               text:

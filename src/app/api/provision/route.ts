@@ -29,7 +29,7 @@ const isLoginId = (s: string) => /^[A-Za-z0-9_-]{1,64}$/.test(s);
 
 /** リンクの base URL（members API と同じ・NEXTAUTH_URL 優先）。 */
 const inviteLinkBase = () =>
-  (process.env.NEXTAUTH_URL || "https://sumakouba-zaiko.vercel.app").replace(/\/+$/, "");
+  (process.env.NEXTAUTH_URL || "https://paloma-pf-zaiko.vercel.app").replace(/\/+$/, "");
 
 /** タイミング安全なキー比較（長さ違いは即 false 扱い）。 */
 function safeKeyEqual(a: string, b: string): boolean {
@@ -65,7 +65,7 @@ async function sendInviteMail(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: process.env.CONTACT_FROM || "PF在庫管理 <noreply@sumakouba.com>",
+        from: process.env.CONTACT_FROM || "PF在庫管理 <noreply@paloma-pf.com>",
         to: [email],
         subject: "【PF在庫管理】アカウント発行のご案内",
         text:
