@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       const token = randomBytes(32).toString("hex");
       await storeResetToken(user.id, token);
 
-      const base = process.env.NEXTAUTH_URL || "https://paloma-pf-zaiko.vercel.app";
+      const base = process.env.NEXTAUTH_URL || "https://zaiko.paloma-pf.com";
       const link = `${base.replace(/\/$/, "")}/password-reset/confirm?token=${token}`;
 
       if (process.env.RESEND_API_KEY) {

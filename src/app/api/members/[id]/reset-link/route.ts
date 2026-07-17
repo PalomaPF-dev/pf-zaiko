@@ -45,7 +45,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
       VALUES (${id}, ${hashResetToken(token)},
               NOW() + make_interval(mins => ${RESET_LINK_TTL_MINUTES}))`;
 
-    const base = (process.env.NEXTAUTH_URL || "https://paloma-pf-zaiko.vercel.app").replace(/\/+$/, "");
+    const base = (process.env.NEXTAUTH_URL || "https://zaiko.paloma-pf.com").replace(/\/+$/, "");
     const resetUrl = `${base}/password-reset/confirm?token=${token}`;
 
     // メールアドレスが登録されていれば送信（無くてもリンクは返す）

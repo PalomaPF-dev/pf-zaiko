@@ -1,6 +1,6 @@
 # Paloma品質 — App Store 申請手順・メタデータ
 
-シリーズ共通の Capacitor リモート読込方式（WebView で https://paloma-pf-hinshitsu.vercel.app を表示）。
+シリーズ共通の Capacitor リモート読込方式（WebView で https://zaiko.paloma-pf.com を表示）。
 アンチステアリング対応（WebOnly: ネイティブでは価格/新規登録/外部課金リンク非表示）は実装済み。
 
 ---
@@ -87,7 +87,7 @@ Paloma品質は、製造現場の品質チェックを「QC工程表のとおり
 | 項目 | 値 |
 | --- | --- |
 | サポートURL | https://www.paloma-pf.com |
-| プライバシーポリシーURL | https://paloma-pf-hinshitsu.vercel.app/privacy |
+| プライバシーポリシーURL | https://zaiko.paloma-pf.com/privacy |
 | Copyright | Paloma |
 
 ## 3. App プライバシー（データ収集）

@@ -29,7 +29,7 @@ const isLoginId = (s: string) => /^[A-Za-z0-9_-]{1,64}$/.test(s);
 
 /** リンクの base URL（members API と同じ・NEXTAUTH_URL 優先）。 */
 const inviteLinkBase = () =>
-  (process.env.NEXTAUTH_URL || "https://paloma-pf-zaiko.vercel.app").replace(/\/+$/, "");
+  (process.env.NEXTAUTH_URL || "https://zaiko.paloma-pf.com").replace(/\/+$/, "");
 
 /** タイミング安全なキー比較（長さ違いは即 false 扱い）。 */
 function safeKeyEqual(a: string, b: string): boolean {
