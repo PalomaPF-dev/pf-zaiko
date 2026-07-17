@@ -88,7 +88,7 @@ Paloma品質は、製造現場の品質チェックを「QC工程表のとおり
 | --- | --- |
 | サポートURL | https://www.sumakouba.com |
 | プライバシーポリシーURL | https://sumakouba-hinshitsu.vercel.app/privacy |
-| Copyright | Paloma運営事務局 |
+| Copyright | Paloma |
 
 ## 3. App プライバシー（データ収集）
 
