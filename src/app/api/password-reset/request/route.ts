@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       const token = randomBytes(32).toString("hex");
       await storeResetToken(user.id, token);
 
-      const base = process.env.NEXTAUTH_URL || "https://sumakouba-zaiko.vercel.app";
+      const base = process.env.NEXTAUTH_URL || "https://zaiko.paloma-pf.com";
       const link = `${base.replace(/\/$/, "")}/password-reset/confirm?token=${token}`;
 
       if (process.env.RESEND_API_KEY) {
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              from: process.env.CONTACT_FROM || "PF在庫管理 <noreply@sumakouba.com>",
+              from: process.env.CONTACT_FROM || "PF在庫管理 <noreply@paloma-pf.com>",
               to: [email],
               subject: "【PF在庫管理】パスワード再設定のご案内",
               text:
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
                 `以下のリンクから${RESET_TOKEN_TTL_MINUTES}分以内に再設定してください。\n\n` +
                 `${link}\n\n` +
                 `心当たりがない場合は、このメールを破棄してください（パスワードは変更されません）。\n\n` +
-                `--\nPF在庫管理\nPF運営事務局\n`,
+                `--\nPF在庫管理\n`,
               // MAIL_REPLY_TO（設定時のみ）を既定の Reply-To として付与
               ...(process.env.MAIL_REPLY_TO?.trim() ? { reply_to: process.env.MAIL_REPLY_TO.trim() } : {}),
             }),

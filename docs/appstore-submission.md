@@ -1,6 +1,6 @@
-# スマコウバ品質 — App Store 申請手順・メタデータ
+# Paloma品質 — App Store 申請手順・メタデータ
 
-シリーズ共通の Capacitor リモート読込方式（WebView で https://sumakouba-hinshitsu.vercel.app を表示）。
+シリーズ共通の Capacitor リモート読込方式（WebView で https://zaiko.paloma-pf.com を表示）。
 アンチステアリング対応（WebOnly: ネイティブでは価格/新規登録/外部課金リンク非表示）は実装済み。
 
 ---
@@ -12,13 +12,13 @@
 sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 
 # プロジェクトを開く
-cd "/Users/tetsuya/Code Try/sumakouba-hinshitsu"
+cd "/Users/tetsuya/Code Try/paloma-pf-hinshitsu"
 npx cap open ios     # または open ios/App/App.xcodeproj
 ```
 
 Xcode での設定（初回のみ）:
 1. TARGETS → App → **Signing & Capabilities** → Team に Apple Developer アカウントを選択
-2. Bundle Identifier: `jp.sumakouba.hinshitsu`（設定済み）
+2. Bundle Identifier: `jp.paloma-pf.hinshitsu`（設定済み）
 3. General → Identity → Version `1.0` / Build `1`
 
 Archive → 提出:
@@ -31,10 +31,10 @@ Archive → 提出:
 | 項目 | 値 |
 | --- | --- |
 | プラットフォーム | iOS |
-| 名前 | **スマコウバ品質** |
+| 名前 | **Paloma品質** |
 | プライマリ言語 | 日本語 |
-| バンドルID | `jp.sumakouba.hinshitsu`（Identifiers に未登録なら App IDs で先に作成） |
-| SKU | `sumakouba-hinshitsu` |
+| バンドルID | `jp.paloma-pf.hinshitsu`（Identifiers に未登録なら App IDs で先に作成） |
+| SKU | `paloma-pf-hinshitsu` |
 | カテゴリ | ビジネス（サブ: 仕事効率化） |
 | 価格 | 無料（App内課金なし。Web側のプランは表示しない＝アンチステアリング対応済み） |
 
@@ -50,7 +50,7 @@ QC工程表・検査基準書どおりの品質チェックをスマホで。測
 
 ### 説明文
 ```
-スマコウバ品質は、製造現場の品質チェックを「QC工程表のとおりに、確実に」記録するためのアプリです。
+Paloma品質は、製造現場の品質チェックを「QC工程表のとおりに、確実に」記録するためのアプリです。
 
 ■ QC工程表・検査手順書をそのままアプリに
 ・工程フロー（JIS工程記号）→ 管理項目 → 管理基準の3階層で登録
@@ -74,7 +74,7 @@ QC工程表・検査基準書どおりの品質チェックをスマホで。測
 ■ その他
 ・工場・職場ごとのダッシュボード
 ・検査記録の検索・CSV出力
-・図面番号・図面ファイルの添付（スマコウバ図面と図番で連携）
+・図面番号・図面ファイルの添付（Paloma図面と図番で連携）
 
 ※ 本アプリの利用にはアカウントが必要です。「ログインせずにデモを見る」からサンプルデータで全機能をお試しいただけます。
 ```
@@ -86,9 +86,9 @@ QC工程表・検査基準書どおりの品質チェックをスマホで。測
 
 | 項目 | 値 |
 | --- | --- |
-| サポートURL | https://www.sumakouba.com |
-| プライバシーポリシーURL | https://sumakouba-hinshitsu.vercel.app/privacy |
-| Copyright | スマコウバ運営事務局 |
+| サポートURL | https://www.paloma-pf.com |
+| プライバシーポリシーURL | https://zaiko.paloma-pf.com/privacy |
+| Copyright | Paloma |
 
 ## 3. App プライバシー（データ収集）
 
@@ -134,7 +134,7 @@ xcrun simctl boot "iPhone 16 Pro Max"
 
 ## 6. 提出前チェックリスト
 
-- [ ] Xcode: Team 設定・Bundle ID `jp.sumakouba.hinshitsu`
+- [ ] Xcode: Team 設定・Bundle ID `jp.paloma-pf.hinshitsu`
 - [ ] Version/Build 番号
 - [ ] Archive → Upload 成功
 - [ ] App Store Connect: メタデータ・スクリーンショット・プライバシー入力

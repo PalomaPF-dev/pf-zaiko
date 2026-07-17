@@ -45,7 +45,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
       VALUES (${id}, ${hashResetToken(token)},
               NOW() + make_interval(mins => ${RESET_LINK_TTL_MINUTES}))`;
 
-    const base = (process.env.NEXTAUTH_URL || "https://sumakouba-zaiko.vercel.app").replace(/\/+$/, "");
+    const base = (process.env.NEXTAUTH_URL || "https://zaiko.paloma-pf.com").replace(/\/+$/, "");
     const resetUrl = `${base}/password-reset/confirm?token=${token}`;
 
     // メールアドレスが登録されていれば送信（無くてもリンクは返す）
@@ -59,7 +59,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: process.env.CONTACT_FROM || "PF在庫管理 <noreply@sumakouba.com>",
+            from: process.env.CONTACT_FROM || "PF在庫管理 <noreply@paloma-pf.com>",
             to: [target.email],
             subject: "【PF在庫管理】パスワード設定リンクのご案内",
             text:
@@ -69,7 +69,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
               `${resetUrl}\n\n` +
               `パスワードを設定すると、社員番号とパスワードでログインできるようになります。\n` +
               `心当たりがない場合は、このメールを破棄してください。\n\n` +
-              `--\nPF在庫管理\nPF運営事務局\n`,
+              `--\nPF在庫管理\n`,
             // MAIL_REPLY_TO（設定時のみ）を既定の Reply-To として付与
             ...(process.env.MAIL_REPLY_TO?.trim() ? { reply_to: process.env.MAIL_REPLY_TO.trim() } : {}),
           }),

@@ -110,7 +110,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
       {/* PFアプリポータルへ（外部リンクなので通常の a タグ） */}
       <div className="mt-4 border-t border-[#eeeeee] pt-2">
         <a
-          href="https://pf-apps.vercel.app"
+          href="https://portal.paloma-pf.com"
           onClick={onNavigate}
           className="relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[#555555] transition-colors hover:bg-[#f7f7f5]"
         >

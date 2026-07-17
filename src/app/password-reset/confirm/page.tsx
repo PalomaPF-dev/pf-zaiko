@@ -142,7 +142,7 @@ function ConfirmForm() {
           </div>
           <div className="mt-4 text-center">
             <a
-              href="https://pf-apps.vercel.app"
+              href="https://portal.paloma-pf.com"
               className="text-sm text-[#707070] transition-colors hover:text-[#d44fe6]"
             >
               ← ポータルへ戻る
