@@ -44,6 +44,8 @@ type ProvisionResult = {
   status: "created" | "exists" | "error";
   inviteUrl?: string;
   message?: string;
+  // created: false（招待直後はパスワード未設定）/ exists: pending の反転 / error: 省略
+  passwordSet?: boolean;
 };
 
 /** 招待メール送信（members API の文面を流用）。失敗しても throw しない。 */
@@ -158,9 +160,10 @@ export async function POST(req: Request) {
         // 既存ユーザー（login_id 一致）: ポータル側の編集を反映（氏名・役割・承認者、
         // メールは非空指定時のみ）。pending / password_hash には触れない。
         // regenerateLinks のときだけ設定リンクを再発行。
-        const existing = await sql`SELECT id FROM users WHERE login_id = ${loginId} LIMIT 1`;
+        const existing = await sql`SELECT id, pending FROM users WHERE login_id = ${loginId} LIMIT 1`;
         if (existing.length > 0) {
           const userId = existing[0].id as string;
+          const passwordSet = !existing[0].pending;
           await sql`
             UPDATE users
             SET name = COALESCE(NULLIF(${name}, ''), name),
@@ -169,7 +172,7 @@ export async function POST(req: Request) {
                 email = COALESCE(${email}, email)
             WHERE id = ${userId}`;
           if (!regenerateLinks) {
-            results.push({ loginId, status: "exists" });
+            results.push({ loginId, status: "exists", passwordSet });
             continue;
           }
           const token = randomBytes(32).toString("hex");
@@ -181,6 +184,7 @@ export async function POST(req: Request) {
             loginId,
             status: "exists",
             inviteUrl: `${inviteLinkBase()}/password-reset/confirm?token=${token}`,
+            passwordSet,
           });
           continue;
         }
@@ -199,7 +203,7 @@ export async function POST(req: Request) {
                   NOW() + make_interval(mins => ${INVITE_TOKEN_TTL_MINUTES}))`;
         const inviteUrl = `${inviteLinkBase()}/password-reset/confirm?token=${token}`;
         if (email) await sendInviteMail(name, loginId, email, inviteUrl);
-        results.push({ loginId, status: "created", inviteUrl });
+        results.push({ loginId, status: "created", inviteUrl, passwordSet: false });
       } catch (e) {
         // email 一意制約違反などもここに落として続行
         results.push({ loginId, status: "error", message: (e as Error).message });
