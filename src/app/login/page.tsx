@@ -154,6 +154,13 @@ function LoginPageBody() {
               )}
             </button>
 
+            {/* ポータルで発行された社員番号アカウント（pending）の初回パスワード設定 */}
+            <div className="mt-4 rounded-lg border border-[#d44fe6]/40 bg-[#faf5fb] px-3 py-2.5 text-center text-sm">
+              <Link href="/first-login" className="font-semibold text-[#d44fe6] hover:underline">
+                初めてログインする方はこちら（パスワード設定）
+              </Link>
+            </div>
+
             <div className="mt-3 text-center text-sm">
               <Link href="/password-reset" className="text-[#d44fe6] hover:underline">
                 パスワードをお忘れの方はこちら
