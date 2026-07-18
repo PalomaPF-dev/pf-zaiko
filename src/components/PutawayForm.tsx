@@ -5,6 +5,7 @@ import { ScanLine, PackageCheck, CheckCircle2, XCircle, ArrowLeft } from "lucide
 import type { ActionResult } from "@/lib/actions";
 import { productLabelCode } from "@/lib/types";
 import InventoryQrScanner from "@/components/InventoryQrScanner";
+import OperatorSelect from "@/components/OperatorSelect";
 
 export interface PutawayProduct {
   productId: string;
@@ -242,6 +243,9 @@ export default function PutawayForm({
         />
         <p className="mt-1 text-xs text-slate-400">一部だけ棚入れする場合は数量を減らせます（残りは別ロケにも棚入れ可）。</p>
       </div>
+
+      {/* 作業者（名簿があれば選択。未登録ならアカウント名で記録） */}
+      <OperatorSelect />
 
       <button
         type="submit"

@@ -115,6 +115,13 @@ async function seedSampleData(sql: any, companyId: string): Promise<void> {
   const tape = await product("マスキングテープ 24mm", "18m 5巻", "巻", 15, "消耗品", "3M", "MSK-TP-24", "モノタロウ");
   const gun = await product("すべり止め軍手", "10双組", "双", 30, "消耗品", "おたふく手袋", "GUN-NBR-12", "モノタロウ");
 
+  // --- 作業者名簿（記録入力時に選択する名前。アカウントとは独立） ---
+  await sql`
+    INSERT INTO workers (company_id, name) VALUES
+      (${companyId}, ${"デモ太郎"}),
+      (${companyId}, ${"デモ花子"})
+    ON CONFLICT (company_id, name) DO NOTHING`;
+
   // --- 在庫＋受払（職場の既定置き場へ直接投入。時刻を散らし、一部は本日分） ---
   const move = async (
     productId: string, locationId: string, txType: string, delta: number, after: number,

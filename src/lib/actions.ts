@@ -271,7 +271,8 @@ export async function recordMovementAction(fd: FormData): Promise<ActionResult> 
         txType,
         qty: qtyRaw,
         refNo: strOrNull(fd, "refNo"),
-        operator: userName || "（未設定）",
+        // 作業者名簿から選択された名前を優先（未選択はログイン中のアカウント名）
+        operator: str(fd, "operator") || userName || "（未設定）",
         note: strOrNull(fd, "note"),
         deliverTo: strOrNull(fd, "deliverTo"),
         partnerName: strOrNull(fd, "partnerName"),
@@ -314,7 +315,8 @@ export async function moveStockAction(fd: FormData): Promise<ActionResult> {
         toLocationId,
         qty,
         refNo: strOrNull(fd, "refNo"),
-        operator: userName || "（未設定）",
+        // 作業者名簿から選択された名前を優先（未選択はログイン中のアカウント名）
+        operator: str(fd, "operator") || userName || "（未設定）",
         note: strOrNull(fd, "note"),
         partnerName: strOrNull(fd, "partnerName"),
       },
@@ -350,7 +352,8 @@ export async function createStocktakeAction(fd: FormData): Promise<void> {
 /** 実棚数をまとめて保存（明細フォームの count_<lineId> を一括反映）。空欄はスキップ。 */
 export async function saveStocktakeCountsAction(stocktakeId: string, fd: FormData): Promise<void> {
   const { companyId, userName } = await requireEntitledSession();
-  const operator = userName || "（未設定）";
+  // 作業者名簿から選択された名前を優先（未選択はログイン中のアカウント名）
+  const operator = str(fd, "operator") || userName || "（未設定）";
   const tasks: Promise<void>[] = [];
   for (const [key, value] of fd.entries()) {
     if (!key.startsWith("count_")) continue;
@@ -535,7 +538,8 @@ export async function putawayAction(fd: FormData): Promise<ActionResult> {
       productId,
       locationId,
       qty,
-      operator: userName || "（未設定）",
+      // 作業者名簿から選択された名前を優先（未選択はログイン中のアカウント名）
+      operator: str(fd, "operator") || userName || "（未設定）",
     });
     revalidatePath("/putaway");
     revalidatePath("/stock");
@@ -796,6 +800,6 @@ export async function supplyAdjustAction(fd: FormData): Promise<ActionResult> {
   }
 }
 
-// ===== ユーザー管理（管理者のみ） =====
-// アカウントの発行・削除・役割変更は招待方式（/api/members）へ移行済み。
-// UI は設定画面の <MemberManagement>、権限チェックは API 側（getSessionWithRole）で担保する。
+// ===== ユーザー管理 =====
+// アカウントの発行・削除はポータル（/api/provision）へ移行済み。アプリ内では
+// 作業者（workers。/api/workers）だけを管理し、記録入力時に名前を選択してもらう。

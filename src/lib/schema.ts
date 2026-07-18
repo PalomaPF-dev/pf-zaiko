@@ -367,4 +367,17 @@ async function buildSchema(): Promise<void> {
       company_id UUID PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
       next_no    INTEGER NOT NULL DEFAULT 1
     )`);
+
+  // --- 作業者（アプリ内名簿。2026-07 アカウント方針変更） ---
+  // ログインアカウントはポータルで払い出す共有アカウントのみ。個々の作業者は
+  // アカウントを持たず、この名簿から記録入力時に自分の名前を選択する。
+  await safeDdl(() => sql`
+    CREATE TABLE IF NOT EXISTS workers (
+      id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      name       TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (company_id, name)
+    )`);
+  await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS workers_company_idx ON workers(company_id, created_at)`);
 }

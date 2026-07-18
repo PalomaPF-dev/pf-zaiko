@@ -6,6 +6,7 @@ import { ScanLine, ArrowLeftRight, CheckCircle2, XCircle, Printer } from "lucide
 import type { ActionResult } from "@/lib/actions";
 import type { TxType } from "@/lib/types";
 import InventoryQrScanner from "@/components/InventoryQrScanner";
+import OperatorSelect from "@/components/OperatorSelect";
 
 export interface IoProduct {
   id: string;
@@ -304,6 +305,9 @@ function IoPanel({
         <input name="note" placeholder="メモ" className={input} />
       </div>
 
+      {/* 作業者（名簿があれば選択。未登録ならアカウント名で記録） */}
+      <OperatorSelect />
+
       <div>
         <button
           type="submit"
@@ -437,6 +441,9 @@ function MovePanel({
         <label className="mb-1 block text-sm font-medium text-slate-600">備考（任意）</label>
         <input name="note" placeholder="メモ" className={input} />
       </div>
+
+      {/* 作業者（名簿があれば選択。未登録ならアカウント名で記録） */}
+      <OperatorSelect />
 
       <div>
         <button
