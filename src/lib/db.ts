@@ -1687,3 +1687,43 @@ export async function putawayProduct(
   }
   return { qtyAfter: after };
 }
+
+// ===== 作業者（アプリ内名簿。アカウントとは独立） =====
+
+export interface Worker {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+/** 会社の作業者一覧（登録順）。 */
+export async function listWorkers(companyId: string): Promise<Worker[]> {
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT id, name, created_at FROM workers
+    WHERE company_id = ${companyId}
+    ORDER BY created_at ASC, name ASC`;
+  return rows.map((r: any) => ({ id: r.id, name: r.name, createdAt: tsStr(r.created_at) }));
+}
+
+/** 作業者を追加。同名が既にあれば null を返す（重複登録しない）。 */
+export async function createWorker(companyId: string, name: string): Promise<Worker | null> {
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    INSERT INTO workers (company_id, name)
+    VALUES (${companyId}, ${name})
+    ON CONFLICT (company_id, name) DO NOTHING
+    RETURNING id, name, created_at`;
+  const r = rows[0] as any;
+  if (!r) return null;
+  return { id: r.id, name: r.name, createdAt: tsStr(r.created_at) };
+}
+
+/** 作業者を削除（過去の記録の氏名文字列はそのまま残る）。 */
+export async function deleteWorker(companyId: string, id: string): Promise<void> {
+  await ensureSchema();
+  const sql = getSql();
+  await sql`DELETE FROM workers WHERE company_id = ${companyId} AND id = ${id}`;
+}

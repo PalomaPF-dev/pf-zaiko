@@ -6,7 +6,7 @@ import PageHeader from "@/components/PageHeader";
 import SubmitButton from "@/components/SubmitButton";
 import MasterTabs from "@/components/MasterTabs";
 import DeleteAccountSection from "@/components/DeleteAccountSection";
-import MemberManagement from "@/components/MemberManagement";
+import WorkerManagement from "@/components/WorkerManagement";
 
 export const dynamic = "force-dynamic";
 
@@ -14,13 +14,13 @@ const input =
   "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-1 focus:ring-fuchsia-500";
 
 export default async function SettingsPage() {
-  const { companyId, userId, email, role, isDemo } = await requireEntitledSession();
+  const { companyId, email, role, isDemo } = await requireEntitledSession();
   const isAdmin = role === "admin";
   const settings = await getCompanySettings(companyId);
 
   return (
     <div className="mx-auto max-w-2xl p-4 sm:p-6">
-      <PageHeader title="マスタ設定" description="商品・工場職場・取引先の各マスタと、在庫ルール・通知先・メンバーを管理します。上のタブで切り替えます。" />
+      <PageHeader title="マスタ設定" description="商品・工場職場・取引先の各マスタと、在庫ルール・通知先・作業者を管理します。上のタブで切り替えます。" />
 
       <MasterTabs />
 
@@ -76,12 +76,10 @@ export default async function SettingsPage() {
         </div>
       )}
 
-      {/* メンバー（アカウント管理）＝管理者限定。デモでは非表示 */}
-      {isAdmin && !isDemo && (
-        <div className="mt-6">
-          <MemberManagement myUserId={userId} />
-        </div>
-      )}
+      {/* 作業者管理（アカウント管理はポータル。ログイン中なら誰でも操作可） */}
+      <div className="mt-6">
+        <WorkerManagement />
+      </div>
 
       {/* 危険な操作（アカウント削除＝退会）。デモでは出さない */}
       {!isDemo && <DeleteAccountSection />}

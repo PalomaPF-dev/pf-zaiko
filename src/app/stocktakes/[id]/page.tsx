@@ -16,6 +16,7 @@ import SubmitButton from "@/components/SubmitButton";
 import ConfirmForm from "@/components/ConfirmForm";
 import { StocktakeStatusBadge } from "@/components/Badges";
 import DbErrorState from "@/components/DbErrorState";
+import OperatorSelect from "@/components/OperatorSelect";
 
 export const dynamic = "force-dynamic";
 
@@ -189,6 +190,10 @@ export default async function StocktakeDetailPage({ params }: { params: Promise<
         </div>
         {editable && lines.length > 0 && (
           <div className="mt-4">
+            {/* 作業者（名簿があれば選択。未登録ならアカウント名で記録） */}
+            <div className="mb-3 max-w-xs">
+              <OperatorSelect />
+            </div>
             <SubmitButton className="inline-flex items-center gap-1.5" pendingText="保存中…">
               <Save className="h-4 w-4" />
               実棚数を保存

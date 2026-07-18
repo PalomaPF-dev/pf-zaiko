@@ -49,9 +49,10 @@ export default function GuidePage() {
       {/* ===== セットアップ ===== */}
       <h2 className="mb-4 border-l-4 border-fuchsia-600 pl-3 text-lg font-bold text-slate-800">初期セットアップ（管理者）</h2>
       <div className="flex flex-col gap-4">
-        <GuideStep no={1} icon={ShieldCheck} title="メンバーを招待する" href="/settings" linkLabel="設定を開く">
-          「マスタ設定」の<b>メンバー管理</b>から、現場の担当者を<b>社員番号</b>で発行・招待します。役割は
-          <b>一般</b>（入出庫・棚卸・照会）と<b>管理者</b>（＋設定・メンバー・工場職場の登録）。在庫アラートの通知先やマイナス在庫の許容も設定できます。
+        <GuideStep no={1} icon={ShieldCheck} title="作業者を登録する" href="/settings" linkLabel="設定を開く">
+          ログインアカウントの発行は<b>ポータル</b>で行います。アプリでは「マスタ設定」の<b>作業者管理</b>に
+          現場の担当者の名前を登録すると、入出庫・棚卸の記録時に<b>作業者を選択</b>できます。
+          在庫アラートの通知先やマイナス在庫の許容もここで設定できます。
         </GuideStep>
 
         <GuideStep no={2} icon={Factory} title="工場・職場を登録する" href="/sites" linkLabel="工場・職場">
