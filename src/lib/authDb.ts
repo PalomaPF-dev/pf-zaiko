@@ -44,6 +44,8 @@ export async function ensureAuthSchema(): Promise<void> {
   }
   // 招待（アカウント発行）モデル用。pending=true は招待メール送信済み・パスワード未設定。
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS pending BOOLEAN NOT NULL DEFAULT false`;
+  // 承認者の社員番号（ポータル provision v2 で連携・冪等追加）。NULL = 未設定。
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS approver_login_id TEXT`;
   // 社員番号ログイン（login_id）への移行。email は任意（社内は未登録の社員が多い）。
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS login_id TEXT`;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS users_login_id_idx ON users(login_id)`;
@@ -164,14 +166,15 @@ export async function createInvitedUser(
   loginId: string,
   name: string,
   role: UserRole,
-  email: string | null = null
+  email: string | null = null,
+  approverLoginId: string | null = null
 ): Promise<string> {
   const sql = getSql();
   // ランダムな使えないパスワード（招待完了までログイン不可）
   const passwordHash = await bcrypt.hash(crypto.randomBytes(24).toString("hex"), 12);
   const rows = await sql`
-    INSERT INTO users (company_id, login_id, email, name, password_hash, role, pending)
-    VALUES (${companyId}, ${loginId}, ${email}, ${name}, ${passwordHash}, ${role}, true)
+    INSERT INTO users (company_id, login_id, email, name, password_hash, role, pending, approver_login_id)
+    VALUES (${companyId}, ${loginId}, ${email}, ${name}, ${passwordHash}, ${role}, true, ${approverLoginId})
     RETURNING id`;
   return rows[0].id as string;
 }
