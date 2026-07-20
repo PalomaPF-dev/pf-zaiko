@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { MapPin, Plus, Search, Tag, Trash2, Factory } from "lucide-react";
-import { requireEntitledSession } from "@/lib/session";
+import { requireAdminPage } from "@/lib/session";
 import { listLocations, listUsedAreas } from "@/lib/db";
 import { resolveCurrentWorkplace } from "@/lib/workplace";
 import { deleteLocationAction } from "@/lib/actions";
@@ -17,7 +17,7 @@ export default async function LocationsPage({
 }: {
   searchParams: Promise<{ area?: string; q?: string }>;
 }) {
-  const session = await requireEntitledSession();
+  const session = await requireAdminPage();
   const sp = await searchParams;
   const area = sp.area?.trim() || null;
   const search = sp.q?.trim() || null;

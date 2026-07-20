@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { requireEntitledSession } from "@/lib/session";
+import { requireAdminPage } from "@/lib/session";
 import { getProduct, listCategories, listPartners } from "@/lib/db";
 import { updateProductAction, deleteProductAction } from "@/lib/actions";
 import PageHeader from "@/components/PageHeader";
@@ -11,7 +11,7 @@ import ConfirmForm from "@/components/ConfirmForm";
 export const dynamic = "force-dynamic";
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminPage();
   const { id } = await params;
   const [product, categories, suppliers] = await Promise.all([
     getProduct(companyId, id),

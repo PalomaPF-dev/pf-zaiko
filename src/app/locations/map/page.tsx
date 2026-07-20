@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { requireEntitledSession } from "@/lib/session";
+import { requireAdminPage } from "@/lib/session";
 import { resolveCurrentWorkplace } from "@/lib/workplace";
 import { getWorkplace, listAreaPins, listWorkplaceAreas } from "@/lib/db";
 import PageHeader from "@/components/PageHeader";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 /** エリアマップ: 現在の職場の見取り図＋エリアの位置ピン。 */
 export default async function LocationsMapPage() {
-  const session = await requireEntitledSession();
+  const session = await requireAdminPage();
   const wp = await resolveCurrentWorkplace(session.companyId);
   if (!wp) {
     return (

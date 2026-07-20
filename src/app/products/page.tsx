@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Package, Plus, Search } from "lucide-react";
-import { requireEntitledSession } from "@/lib/session";
+import { requireAdminPage } from "@/lib/session";
 import { listProducts } from "@/lib/db";
 import PageHeader from "@/components/PageHeader";
 import { BelowSafetyBadge } from "@/components/Badges";
@@ -14,7 +14,7 @@ export default async function ProductsPage({
 }: {
   searchParams: Promise<{ q?: string; below?: string }>;
 }) {
-  const session = await requireEntitledSession();
+  const session = await requireAdminPage();
   const sp = await searchParams;
   const search = sp.q?.trim() || null;
   const belowOnly = sp.below === "1";

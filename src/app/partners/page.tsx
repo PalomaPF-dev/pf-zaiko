@@ -1,5 +1,5 @@
 import { Contact, Trash2, Save, Plus } from "lucide-react";
-import { requireEntitledSession } from "@/lib/session";
+import { requireAdminPage } from "@/lib/session";
 import { listPartners } from "@/lib/db";
 import { createPartnerAction, updatePartnerAction, deletePartnerAction } from "@/lib/actions";
 import { PARTNER_KIND_LABEL, type PartnerKind } from "@/lib/types";
@@ -23,7 +23,7 @@ const KIND_STYLE: Record<PartnerKind, string> = {
 };
 
 export default async function PartnersPage() {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminPage();
 
   let partners;
   try {

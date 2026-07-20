@@ -127,7 +127,7 @@ function readProductInput(fd: FormData): ProductInput {
 
 /** 商品登録。重複などの失敗は全画面エラーにせず ActionResult で返す（フォームにインライン表示・入力値保持）。 */
 export async function createProductAction(fd: FormData): Promise<ActionResult> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const input = readProductInput(fd);
   if (!input.name) return { ok: false, message: "品名を入力してください" };
   if (!input.makerCode && !input.drawingNo)
@@ -146,7 +146,7 @@ export async function createProductAction(fd: FormData): Promise<ActionResult> {
 }
 
 export async function updateProductAction(id: string, fd: FormData): Promise<ActionResult> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const input = readProductInput(fd);
   if (!input.name) return { ok: false, message: "品名を入力してください" };
   if (!input.makerCode && !input.drawingNo)
@@ -165,7 +165,7 @@ export async function updateProductAction(id: string, fd: FormData): Promise<Act
 }
 
 export async function deleteProductAction(id: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await deleteProduct(companyId, id);
   revalidatePath("/products");
   redirect("/products");
@@ -174,7 +174,7 @@ export async function deleteProductAction(id: string): Promise<void> {
 // ===== ロケーション =====
 
 export async function createAreaAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const code = str(fd, "code").toUpperCase();
   if (!/^[A-Z]{1,2}$/.test(code)) throw new Error("エリアは A〜Z（1〜2字）で入力してください");
   await createArea(companyId, code, strOrNull(fd, "name"));
@@ -183,14 +183,14 @@ export async function createAreaAction(fd: FormData): Promise<void> {
 }
 
 export async function deleteAreaAction(id: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await deleteArea(companyId, id);
   revalidatePath("/locations");
   revalidatePath("/settings");
 }
 
 export async function createLocationAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const area = str(fd, "area").toUpperCase();
   const rack = str(fd, "rack");
   const level = str(fd, "level");
@@ -215,7 +215,7 @@ export async function createLocationAction(fd: FormData): Promise<void> {
 }
 
 export async function bulkCreateLocationsAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const area = str(fd, "area").toUpperCase();
   if (!/^[A-Z]{1,2}$/.test(area)) throw new Error("エリアは A〜Z（1〜2字）で入力してください");
   const wp = await resolveCurrentWorkplace(companyId);
@@ -241,7 +241,7 @@ export async function bulkCreateLocationsAction(fd: FormData): Promise<void> {
 }
 
 export async function deleteLocationAction(id: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await deleteLocation(companyId, id);
   revalidatePath("/locations");
   redirect("/locations");
@@ -570,7 +570,7 @@ function readPartnerInput(fd: FormData): PartnerInput {
 }
 
 export async function createPartnerAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const input = readPartnerInput(fd);
   if (!input.name) throw new Error(`${PARTNER_KIND_LABEL[input.kind]}名を入力してください`);
   await createPartner(companyId, input);
@@ -578,7 +578,7 @@ export async function createPartnerAction(fd: FormData): Promise<void> {
 }
 
 export async function updatePartnerAction(id: string, fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const input = readPartnerInput(fd);
   if (!input.name) throw new Error("名称を入力してください");
   await updatePartner(companyId, id, input);
@@ -586,7 +586,7 @@ export async function updatePartnerAction(id: string, fd: FormData): Promise<voi
 }
 
 export async function deletePartnerAction(id: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await deletePartner(companyId, id);
   revalidatePath("/partners");
 }
@@ -594,7 +594,7 @@ export async function deletePartnerAction(id: string): Promise<void> {
 // ===== 設定 =====
 
 export async function updateNotifyEmailsAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await updateNotifyEmails(companyId, str(fd, "emails"));
   revalidatePath("/settings");
 }
@@ -608,27 +608,27 @@ export async function updateAllowNegativeAction(fd: FormData): Promise<void> {
 // ===== 拠点（工場 / 職場）マスタ =====
 
 export async function createSiteAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const name = str(fd, "name");
   if (name) await createSite(companyId, name);
   revalidatePath("/sites");
 }
 
 export async function updateSiteAction(id: string, fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const name = str(fd, "name");
   if (name) await updateSite(companyId, id, name);
   revalidatePath("/sites");
 }
 
 export async function deleteSiteAction(id: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await deleteSite(companyId, id);
   revalidatePath("/sites");
 }
 
 export async function createWorkplaceAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const siteId = str(fd, "siteId");
   const name = str(fd, "name");
   if (siteId && name) await createWorkplace(companyId, siteId, name);
@@ -636,14 +636,14 @@ export async function createWorkplaceAction(fd: FormData): Promise<void> {
 }
 
 export async function updateWorkplaceAction(id: string, fd: FormData): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const name = str(fd, "name");
   if (name) await updateWorkplace(companyId, id, name);
   revalidatePath("/sites");
 }
 
 export async function deleteWorkplaceAction(id: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await deleteWorkplace(companyId, id);
   revalidatePath("/sites");
 }
@@ -664,7 +664,7 @@ export async function setCurrentWorkplaceAction(workplaceId: string): Promise<vo
 
 /** 見取り図画像を設定/差し替え/削除。旧 Blob は破棄する。 */
 export async function setWorkplaceMapImageAction(workplaceId: string, url: string | null): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const old = await setWorkplaceMapImage(companyId, workplaceId, url);
   if (old && old !== url && old.includes("blob.vercel-storage.com")) {
     try {
@@ -679,7 +679,7 @@ export async function setWorkplaceMapImageAction(workplaceId: string, url: strin
 
 /** エリアピンを配置/移動（画像に対する % 座標）。 */
 export async function setAreaPinAction(workplaceId: string, area: string, x: number, y: number): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   const cx = Math.min(100, Math.max(0, x));
   const cy = Math.min(100, Math.max(0, y));
   await setAreaPin(companyId, workplaceId, area, cx, cy);
@@ -688,7 +688,7 @@ export async function setAreaPinAction(workplaceId: string, area: string, x: num
 
 /** エリアピンを削除。 */
 export async function deleteAreaPinAction(workplaceId: string, area: string): Promise<void> {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminSession();
   await deleteAreaPin(companyId, workplaceId, area);
   revalidatePath("/locations/map");
 }
