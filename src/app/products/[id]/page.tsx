@@ -11,7 +11,8 @@ import DbErrorState from "@/components/DbErrorState";
 export const dynamic = "force-dynamic";
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { companyId } = await requireEntitledSession();
+  const { companyId, role } = await requireEntitledSession();
+  const isAdmin = role === "admin";
   const { id } = await params;
 
   let product, stock, txs;
@@ -49,13 +50,15 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
               <ArrowDownToLine className="h-4 w-4" />
               入荷
             </Link>
-            <Link
-              href={`/products/${product.id}/edit`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-            >
-              <Pencil className="h-4 w-4" />
-              編集
-            </Link>
+            {isAdmin && (
+              <Link
+                href={`/products/${product.id}/edit`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                <Pencil className="h-4 w-4" />
+                編集
+              </Link>
+            )}
           </div>
         }
       />

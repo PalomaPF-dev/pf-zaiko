@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, MapPin, LayoutGrid } from "lucide-react";
-import { requireEntitledSession } from "@/lib/session";
+import { requireAdminPage } from "@/lib/session";
 import { listAreas } from "@/lib/db";
 import { createLocationAction, bulkCreateLocationsAction } from "@/lib/actions";
 import PageHeader from "@/components/PageHeader";
@@ -12,7 +12,7 @@ const input =
   "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-1 focus:ring-fuchsia-500";
 
 export default async function NewLocationPage() {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminPage();
   const areas = await listAreas(companyId);
   const areaOptions = areas.map((a) => a.code);
 

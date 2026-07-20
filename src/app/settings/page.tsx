@@ -22,32 +22,34 @@ export default async function SettingsPage() {
     <div className="mx-auto max-w-2xl p-4 sm:p-6">
       <PageHeader title="マスタ設定" description="商品・工場職場・取引先の各マスタと、在庫ルール・通知先・作業者を管理します。上のタブで切り替えます。" />
 
-      <MasterTabs />
+      {isAdmin && <MasterTabs />}
 
-      {/* 在庫アラート通知先 */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5">
-        <h2 className="mb-1 flex items-center gap-1.5 text-sm font-bold text-slate-700">
-          <Bell className="h-4 w-4" />
-          在庫アラート通知先
-        </h2>
-        <p className="mb-4 text-xs text-slate-400">
-          安全在庫を下回った商品を毎日の定期チェックで検出し、以下のアドレスへメール通知します。
-          カンマ区切りで複数指定できます。未設定なら登録ユーザー全員
-          {isDemo || !email ? "（メールアドレス登録済みの方）" : `（${email} など）`}に送信します。
-        </p>
-        <form action={updateNotifyEmailsAction} className="flex flex-col gap-4">
-          <textarea
-            name="emails"
-            defaultValue={settings.notifyEmails}
-            rows={3}
-            placeholder="shizai@example.co.jp, koujou-cho@example.co.jp"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-1 focus:ring-fuchsia-500"
-          />
-          <div>
-            <SubmitButton pendingText="保存中…">設定を保存</SubmitButton>
-          </div>
-        </form>
-      </div>
+      {/* 在庫アラート通知先（マスタ設定＝管理者のみ） */}
+      {isAdmin && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <h2 className="mb-1 flex items-center gap-1.5 text-sm font-bold text-slate-700">
+            <Bell className="h-4 w-4" />
+            在庫アラート通知先
+          </h2>
+          <p className="mb-4 text-xs text-slate-400">
+            安全在庫を下回った商品を毎日の定期チェックで検出し、以下のアドレスへメール通知します。
+            カンマ区切りで複数指定できます。未設定なら登録ユーザー全員
+            {isDemo || !email ? "（メールアドレス登録済みの方）" : `（${email} など）`}に送信します。
+          </p>
+          <form action={updateNotifyEmailsAction} className="flex flex-col gap-4">
+            <textarea
+              name="emails"
+              defaultValue={settings.notifyEmails}
+              rows={3}
+              placeholder="shizai@example.co.jp, koujou-cho@example.co.jp"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-1 focus:ring-fuchsia-500"
+            />
+            <div>
+              <SubmitButton pendingText="保存中…">設定を保存</SubmitButton>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* 在庫ルール（マイナス在庫許容） */}
       {isAdmin && (

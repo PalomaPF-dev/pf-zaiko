@@ -68,6 +68,19 @@ export async function requireAdminSession(): Promise<AppSession> {
   return s;
 }
 
+/**
+ * マスタ系ページ用: ログイン＋利用権に加えて管理者（role=admin）を要求。
+ * 一般ユーザー（member）は "/" にリダイレクトして描画させない。
+ * マスタ設定のサーバーコンポーネント（商品・ロケーション・取引先・拠点など）で使う。
+ */
+export async function requireAdminPage(): Promise<AppSession> {
+  const s = await requireEntitledSession();
+  if (s.role !== "admin") {
+    redirect("/");
+  }
+  return s;
+}
+
 /** リダイレクトせず、未ログインなら null を返す（任意表示用）。 */
 export async function getOptionalSession() {
   const session = await getServerSession(authOptions);

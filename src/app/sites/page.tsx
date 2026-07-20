@@ -1,5 +1,5 @@
 import { Factory, Plus, Trash2, Save, Building2 } from "lucide-react";
-import { requireEntitledSession } from "@/lib/session";
+import { requireAdminPage } from "@/lib/session";
 import { listSites, listWorkplaces } from "@/lib/db";
 import {
   createSiteAction,
@@ -22,7 +22,7 @@ const input =
   "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-1 focus:ring-fuchsia-500";
 
 export default async function SitesPage() {
-  const { companyId } = await requireEntitledSession();
+  const { companyId } = await requireAdminPage();
 
   let sites, workplaces;
   try {
