@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
@@ -83,6 +83,17 @@ function LoginInner() {
       setDemoLoading(false);
     }
   }
+
+  // ポータルの「サンプル事例」リンク（/login?demo=1）から来たときはデモを自動開始する
+  const autoDemoFired = useRef(false);
+  useEffect(() => {
+    if (searchParams.get("demo") !== "1") return;
+    if (autoDemoFired.current || loading || demoLoading) return;
+    autoDemoFired.current = true;
+    void startDemo();
+    // マウント時に一度だけ判定する（startDemo は再生成されるが内容は不変）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f7f7f5]">
