@@ -6,7 +6,6 @@ import PageHeader from "@/components/PageHeader";
 import SubmitButton from "@/components/SubmitButton";
 import MasterTabs from "@/components/MasterTabs";
 import DeleteAccountSection from "@/components/DeleteAccountSection";
-import WorkerManagement from "@/components/WorkerManagement";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +19,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl p-4 sm:p-6">
-      <PageHeader title="マスタ設定" description="商品・工場職場・取引先の各マスタと、在庫ルール・通知先・作業者を管理します。上のタブで切り替えます。" />
+      <PageHeader title="マスタ設定" description="商品・工場職場・取引先の各マスタと、在庫ルール・通知先を管理します。上のタブで切り替えます。作業者アカウントはポータルのユーザー設定で管理します。" />
 
       {isAdmin && <MasterTabs />}
 
@@ -78,10 +77,7 @@ export default async function SettingsPage() {
         </div>
       )}
 
-      {/* 作業者管理（アカウント管理はポータル。ログイン中なら誰でも操作可） */}
-      <div className="mt-6">
-        <WorkerManagement />
-      </div>
+      {/* 作業者管理（旧・アプリ内名簿）は廃止。作業者アカウントはポータルのユーザー設定で管理する */}
 
       {/* 危険な操作（アカウント削除＝退会）。デモでは出さない */}
       {!isDemo && <DeleteAccountSection />}

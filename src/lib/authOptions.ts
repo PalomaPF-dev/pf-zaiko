@@ -93,7 +93,7 @@ export const authOptions: NextAuthOptions = {
           companyId: user.company_id as string,
           companyName: user.company_name as string,
           // 役割導入前のユーザー（role 未設定）は管理者として扱う
-          role: (user.role ?? "admin") as "admin" | "member",
+          role: (user.role ?? "admin") as "admin" | "member" | "worker",
           isDemo: Boolean(user.is_demo),
         };
       },
@@ -118,7 +118,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string;
         session.user.companyId = token.companyId as string;
         session.user.companyName = token.companyName as string;
-        session.user.role = (token.role ?? "admin") as "admin" | "member";
+        session.user.role = (token.role ?? "admin") as "admin" | "member" | "worker";
         session.user.isDemo = Boolean(token.isDemo);
       }
       return session;

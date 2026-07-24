@@ -75,6 +75,20 @@ function intOr(fd: FormData, key: string, fallback: number): number {
   return n == null ? fallback : n;
 }
 
+/**
+ * 記録に載せる担当者名を決める。
+ * 作業者（role='worker'）は送信値を無視して必ず本人（ログイン中のアカウント名）で記録する。
+ * 管理者・一般は作業者アカウント一覧からの代理入力を優先（未選択はログイン中のアカウント名）。
+ */
+function resolveOperator(
+  fd: FormData,
+  role: "admin" | "member" | "worker",
+  userName: string
+): string {
+  if (role === "worker") return userName || "（未設定）";
+  return str(fd, "operator") || userName || "（未設定）";
+}
+
 export interface ActionResult {
   ok: boolean;
   message: string;
@@ -251,7 +265,7 @@ export async function deleteLocationAction(id: string): Promise<void> {
 
 /** 入庫/出庫/調整の1件記録。クライアント（IoForm）から呼ばれ、結果を返す。 */
 export async function recordMovementAction(fd: FormData): Promise<ActionResult> {
-  const { companyId, userName } = await requireEntitledSession();
+  const { companyId, userName, role } = await requireEntitledSession();
   const productId = str(fd, "productId");
   const locationId = str(fd, "locationId");
   const txType = str(fd, "txType") as TxType;
@@ -271,8 +285,7 @@ export async function recordMovementAction(fd: FormData): Promise<ActionResult> 
         txType,
         qty: qtyRaw,
         refNo: strOrNull(fd, "refNo"),
-        // 作業者名簿から選択された名前を優先（未選択はログイン中のアカウント名）
-        operator: str(fd, "operator") || userName || "（未設定）",
+        operator: resolveOperator(fd, role, userName),
         note: strOrNull(fd, "note"),
         deliverTo: strOrNull(fd, "deliverTo"),
         partnerName: strOrNull(fd, "partnerName"),
@@ -296,7 +309,7 @@ export async function recordMovementAction(fd: FormData): Promise<ActionResult> 
 
 /** ロケ間移動。 */
 export async function moveStockAction(fd: FormData): Promise<ActionResult> {
-  const { companyId, userName } = await requireEntitledSession();
+  const { companyId, userName, role } = await requireEntitledSession();
   const productId = str(fd, "productId");
   const fromLocationId = str(fd, "fromLocationId");
   const toLocationId = str(fd, "toLocationId");
@@ -315,8 +328,7 @@ export async function moveStockAction(fd: FormData): Promise<ActionResult> {
         toLocationId,
         qty,
         refNo: strOrNull(fd, "refNo"),
-        // 作業者名簿から選択された名前を優先（未選択はログイン中のアカウント名）
-        operator: str(fd, "operator") || userName || "（未設定）",
+        operator: resolveOperator(fd, role, userName),
         note: strOrNull(fd, "note"),
         partnerName: strOrNull(fd, "partnerName"),
       },
@@ -351,9 +363,8 @@ export async function createStocktakeAction(fd: FormData): Promise<void> {
 
 /** 実棚数をまとめて保存（明細フォームの count_<lineId> を一括反映）。空欄はスキップ。 */
 export async function saveStocktakeCountsAction(stocktakeId: string, fd: FormData): Promise<void> {
-  const { companyId, userName } = await requireEntitledSession();
-  // 作業者名簿から選択された名前を優先（未選択はログイン中のアカウント名）
-  const operator = str(fd, "operator") || userName || "（未設定）";
+  const { companyId, userName, role } = await requireEntitledSession();
+  const operator = resolveOperator(fd, role, userName);
   const tasks: Promise<void>[] = [];
   for (const [key, value] of fd.entries()) {
     if (!key.startsWith("count_")) continue;
@@ -526,7 +537,7 @@ export async function deleteReceiptLineAction(receiptId: string, lineId: string)
 
 /** ②入庫（棚入れ）：未入庫分をロケへ棚入れ。 */
 export async function putawayAction(fd: FormData): Promise<ActionResult> {
-  const { companyId, userName } = await requireEntitledSession();
+  const { companyId, userName, role } = await requireEntitledSession();
   const productId = str(fd, "productId");
   const locationId = str(fd, "locationId");
   const qty = intOrNull(fd, "qty");
@@ -538,8 +549,7 @@ export async function putawayAction(fd: FormData): Promise<ActionResult> {
       productId,
       locationId,
       qty,
-      // 作業者名簿から選択された名前を優先（未選択はログイン中のアカウント名）
-      operator: str(fd, "operator") || userName || "（未設定）",
+      operator: resolveOperator(fd, role, userName),
     });
     revalidatePath("/putaway");
     revalidatePath("/stock");

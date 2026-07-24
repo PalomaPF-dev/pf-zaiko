@@ -10,7 +10,7 @@ export interface AppSession {
   userId: string;
   userName: string;
   email: string;
-  role: "admin" | "member";
+  role: "admin" | "member" | "worker";
   /** 使い捨てデモ会社でログイン中か（デモ専用のUI出し分けに使う） */
   isDemo: boolean;
 }
