@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import { ArrowLeft } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { getLocationByCode } from "@/lib/db";
+import { currentScope } from "@/lib/scope";
 import { parseLocCode } from "@/lib/location";
 import { locationQrPayload } from "@/lib/qr";
 import PrintButton from "@/components/PrintButton";
@@ -28,9 +29,11 @@ export default async function LocationLabelPage({
   const { w, h } = await searchParams;
   const decoded = decodeURIComponent(code);
 
+  const { siteId } = await currentScope();
+
   let location;
   try {
-    location = await getLocationByCode(session.companyId, decoded);
+    location = await getLocationByCode(session.companyId, decoded, siteId);
   } catch (e) {
     console.error("[location label]", e);
     return (

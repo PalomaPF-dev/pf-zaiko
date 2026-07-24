@@ -16,29 +16,34 @@ import {
 import { requireEntitledSession } from "@/lib/session";
 import { listStock, listTransactions, listStocktakes, listSites, listPendingPutaway, listIssueOrders } from "@/lib/db";
 import { resolveCurrentWorkplace } from "@/lib/workplace";
+import { currentScope } from "@/lib/scope";
 import { formatDateTime, todayJST } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import { TxTypeBadge } from "@/components/Badges";
 import DbErrorState from "@/components/DbErrorState";
+import NoWorkplaceState from "@/components/NoWorkplaceState";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const session = await requireEntitledSession();
 
+  // 工場スコープ（一般・作業者は自工場のみ。管理者・工場未設定は全工場）
+  const { scope, siteId } = await currentScope();
+
   let workplace, sites, stock, todaysTx, stocktakes, pending, orders;
   try {
     [workplace, sites] = await Promise.all([
       resolveCurrentWorkplace(session.companyId),
-      listSites(session.companyId),
+      listSites(session.companyId, { siteId }),
     ]);
     if (workplace) {
       [stock, todaysTx, stocktakes, pending, orders] = await Promise.all([
         listStock(session.companyId, { workplaceId: workplace.id, nonZeroOnly: false }),
         listTransactions(session.companyId, { workplaceId: workplace.id, dateFrom: todayJST(), limit: 500 }),
-        listStocktakes(session.companyId),
-        listPendingPutaway(session.companyId),
-        listIssueOrders(session.companyId),
+        listStocktakes(session.companyId, { siteId }),
+        listPendingPutaway(session.companyId, { siteId }),
+        listIssueOrders(session.companyId, { siteId }),
       ]);
     }
   } catch (e) {
@@ -51,7 +56,17 @@ export default async function DashboardPage() {
     );
   }
 
-  // 未セットアップ（工場・職場が無い）の案内
+  // 未セットアップ（工場・職場が無い）の案内。
+  // 工場スコープが効いているユーザーには、セットアップ手順ではなく「表示できるデータが無い」旨を出す
+  // （工場・職場の登録は管理者のみ）。
+  if (!workplace && scope) {
+    return (
+      <div className="p-4 sm:p-6">
+        <PageHeader title="ダッシュボード" description={`${session.companyName} の副資材在庫`} />
+        <NoWorkplaceState />
+      </div>
+    );
+  }
   if (!workplace) {
     return (
       <div className="p-4 sm:p-6">

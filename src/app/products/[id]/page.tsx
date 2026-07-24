@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Pencil, ArrowDownToLine, MapPin, ClipboardList } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { resolveProduct, listStockForProduct, listTransactions } from "@/lib/db";
+import { currentScope } from "@/lib/scope";
 import { formatDateTime } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import { TxTypeBadge, BelowSafetyBadge } from "@/components/Badges";
@@ -19,9 +20,11 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   try {
     product = await resolveProduct(companyId, id);
     if (!product) notFound();
+    // 商品マスタは工場共通だが、在庫・受払は自工場の置き場の分だけ表示する
+    const { siteId } = await currentScope();
     [stock, txs] = await Promise.all([
-      listStockForProduct(companyId, product.id),
-      listTransactions(companyId, { productId: product.id, limit: 30 }),
+      listStockForProduct(companyId, product.id, siteId),
+      listTransactions(companyId, { productId: product.id, siteId, limit: 30 }),
     ]);
   } catch (e) {
     console.error("[product detail]", e);

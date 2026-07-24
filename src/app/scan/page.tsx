@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Search } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { getProductByAnyCode, getLocationByCode } from "@/lib/db";
+import { currentScope } from "@/lib/scope";
 import { isLocCode } from "@/lib/location";
 import PageHeader from "@/components/PageHeader";
 import InventoryQrScanner from "@/components/InventoryQrScanner";
@@ -16,7 +17,9 @@ async function lookupAction(fd: FormData) {
   const raw = String(fd.get("code") ?? "").trim();
   if (!raw) redirect("/scan");
   if (isLocCode(raw)) {
-    const loc = await getLocationByCode(companyId, raw);
+    // 他工場の置き場は開かせない（スコープ外なら「見つかりません」に落とす）
+    const { siteId } = await currentScope();
+    const loc = await getLocationByCode(companyId, raw, siteId);
     if (loc) redirect(`/locations/${encodeURIComponent(loc.code)}`);
   }
   const product = await getProductByAnyCode(companyId, raw);

@@ -6,6 +6,15 @@ import { cookies } from "next/headers";
 import { requireEntitledSession, requireAdminSession, requireSession } from "./session";
 import { CURRENT_WP_COOKIE, currentWorkplaceLocationId, resolveCurrentWorkplace } from "./workplace";
 import {
+  assertIssueOrderInScope,
+  assertLocationInScope,
+  assertReceiptInScope,
+  assertStocktakeInScope,
+  assertWorkplaceInScope,
+  currentSiteScope,
+  scopeSiteId,
+} from "./scope";
+import {
   createProduct,
   updateProduct,
   deleteProduct,
@@ -276,6 +285,8 @@ export async function recordMovementAction(fd: FormData): Promise<ActionResult> 
     return { ok: false, message: "数量を正しく入力してください" };
   }
   try {
+    // 所属工場の外の置き場へは書き込ませない（UIで出さないが、サーバー側でも必ず防ぐ）
+    await assertLocationInScope(companyId, locationId);
     const allowNegative = await getAllowNegative(companyId);
     const { qtyAfter, txId } = await applyMovement(
       companyId,
@@ -319,6 +330,8 @@ export async function moveStockAction(fd: FormData): Promise<ActionResult> {
   }
   if (qty == null || qty <= 0) return { ok: false, message: "数量を正しく入力してください" };
   try {
+    await assertLocationInScope(companyId, fromLocationId);
+    await assertLocationInScope(companyId, toLocationId);
     const allowNegative = await getAllowNegative(companyId);
     const { txId } = await moveStock(
       companyId,
@@ -354,6 +367,7 @@ export async function createStocktakeAction(fd: FormData): Promise<void> {
   const id = await createStocktake(companyId, {
     title,
     workplaceId: wp.id,
+    siteId: wp.siteId,
     scopeLabel: `${wp.siteName}／${wp.name}`,
     createdBy: userName || "（未設定）",
   });
@@ -364,6 +378,7 @@ export async function createStocktakeAction(fd: FormData): Promise<void> {
 /** 実棚数をまとめて保存（明細フォームの count_<lineId> を一括反映）。空欄はスキップ。 */
 export async function saveStocktakeCountsAction(stocktakeId: string, fd: FormData): Promise<void> {
   const { companyId, userName, role } = await requireEntitledSession();
+  await assertStocktakeInScope(companyId, stocktakeId);
   const operator = resolveOperator(fd, role, userName);
   const tasks: Promise<void>[] = [];
   for (const [key, value] of fd.entries()) {
@@ -381,6 +396,7 @@ export async function saveStocktakeCountsAction(stocktakeId: string, fd: FormDat
 
 export async function reviewStocktakeAction(id: string): Promise<void> {
   const { companyId } = await requireEntitledSession();
+  await assertStocktakeInScope(companyId, id);
   await updateStocktakeStatus(companyId, id, "review");
   revalidatePath(`/stocktakes/${id}`);
   revalidatePath("/stocktakes");
@@ -388,12 +404,14 @@ export async function reviewStocktakeAction(id: string): Promise<void> {
 
 export async function backToCountingAction(id: string): Promise<void> {
   const { companyId } = await requireEntitledSession();
+  await assertStocktakeInScope(companyId, id);
   await updateStocktakeStatus(companyId, id, "counting");
   revalidatePath(`/stocktakes/${id}`);
 }
 
 export async function cancelStocktakeAction(id: string): Promise<void> {
   const { companyId } = await requireEntitledSession();
+  await assertStocktakeInScope(companyId, id);
   await updateStocktakeStatus(companyId, id, "cancelled");
   revalidatePath(`/stocktakes/${id}`);
   revalidatePath("/stocktakes");
@@ -402,6 +420,7 @@ export async function cancelStocktakeAction(id: string): Promise<void> {
 
 export async function applyStocktakeAction(id: string): Promise<void> {
   const { companyId, userName } = await requireEntitledSession();
+  await assertStocktakeInScope(companyId, id);
   const applied = await applyStocktake(companyId, id, userName || "（未設定）");
   if (!applied) throw new Error("この棚卸はすでに反映・中止済みです");
   revalidatePath(`/stocktakes/${id}`);
@@ -416,6 +435,8 @@ export async function applyStocktakeAction(id: string): Promise<void> {
 export async function createIssueOrderAction(fd: FormData): Promise<void> {
   const { companyId, userName } = await requireEntitledSession();
   const orderNo = str(fd, "orderNo") || (await nextOrderNo(companyId));
+  // 出庫元の工場を記録（工場スコープの絞り込みに使う）
+  const wp = await resolveCurrentWorkplace(companyId);
   const id = await createIssueOrder(companyId, {
     orderNo,
     customer: strOrNull(fd, "customer"),
@@ -424,6 +445,7 @@ export async function createIssueOrderAction(fd: FormData): Promise<void> {
     shipDate: strOrNull(fd, "shipDate"),
     pickDate: strOrNull(fd, "pickDate"),
     createdBy: userName || "（未設定）",
+    siteId: wp?.siteId ?? null,
   });
   revalidatePath("/issue-orders");
   redirect(`/issue-orders/${id}`);
@@ -431,15 +453,18 @@ export async function createIssueOrderAction(fd: FormData): Promise<void> {
 
 export async function addIssueOrderLineAction(orderId: string, fd: FormData): Promise<void> {
   const { companyId } = await requireEntitledSession();
+  await assertIssueOrderInScope(companyId, orderId);
   const productId = str(fd, "productId");
   const qty = intOrNull(fd, "qtyPlanned");
   if (!productId) throw new Error("商品を選択してください");
   if (qty == null || qty <= 0) throw new Error("出荷予定数を正しく入力してください");
   // 引当は現在の職場のロケに限定する
   const wp = await resolveCurrentWorkplace(companyId);
+  const locationId = strOrNull(fd, "locationId");
+  if (locationId) await assertLocationInScope(companyId, locationId);
   await addIssueOrderLine(companyId, orderId, {
     productId,
-    locationId: strOrNull(fd, "locationId"),
+    locationId,
     lotNo: strOrNull(fd, "lotNo"),
     qtyPlanned: qty,
     workplaceId: wp?.id ?? null,
@@ -449,6 +474,7 @@ export async function addIssueOrderLineAction(orderId: string, fd: FormData): Pr
 
 export async function deleteIssueOrderLineAction(orderId: string, lineId: string): Promise<void> {
   const { companyId } = await requireEntitledSession();
+  await assertIssueOrderInScope(companyId, orderId);
   await deleteIssueOrderLine(companyId, lineId);
   revalidatePath(`/issue-orders/${orderId}`);
 }
@@ -457,6 +483,7 @@ export async function deleteIssueOrderLineAction(orderId: string, lineId: string
 export async function issueOrderLineAction(orderId: string, lineId: string): Promise<ActionResult> {
   const { companyId, userName } = await requireEntitledSession();
   try {
+    await assertIssueOrderInScope(companyId, orderId);
     const allowNegative = await getAllowNegative(companyId);
     const { qtyAfter } = await issueOrderLine(companyId, orderId, lineId, userName || "（未設定）", allowNegative);
     revalidatePath(`/issue-orders/${orderId}`);
@@ -473,6 +500,7 @@ export async function issueOrderLineAction(orderId: string, lineId: string): Pro
 export async function issueAllOrderLinesAction(orderId: string): Promise<ActionResult> {
   const { companyId, userName } = await requireEntitledSession();
   try {
+    await assertIssueOrderInScope(companyId, orderId);
     const allowNegative = await getAllowNegative(companyId);
     const { issued, skipped, failed } = await issueAllOrderLines(companyId, orderId, userName || "（未設定）", allowNegative);
     revalidatePath(`/issue-orders/${orderId}`);
@@ -491,6 +519,7 @@ export async function issueAllOrderLinesAction(orderId: string): Promise<ActionR
 
 export async function cancelIssueOrderAction(id: string): Promise<void> {
   const { companyId } = await requireEntitledSession();
+  await assertIssueOrderInScope(companyId, id);
   await updateIssueOrderStatus(companyId, id, "cancelled");
   revalidatePath("/issue-orders");
   revalidatePath(`/issue-orders/${id}`);
@@ -502,9 +531,12 @@ export async function cancelIssueOrderAction(id: string): Promise<void> {
 /** ①入荷：受入伝票を作成（納入場所を指定）。 */
 export async function createReceiptAction(fd: FormData): Promise<void> {
   const { companyId, userName } = await requireEntitledSession();
+  // 受け入れた工場を記録（工場スコープの絞り込み・棚入れ候補の限定に使う）
+  const wp = await resolveCurrentWorkplace(companyId);
   const { id } = await createReceipt(companyId, {
     deliverTo: strOrNull(fd, "deliverTo"),
     createdBy: userName || "（未設定）",
+    siteId: wp?.siteId ?? null,
   });
   revalidatePath("/inbound");
   redirect(`/inbound/${id}`);
@@ -513,6 +545,7 @@ export async function createReceiptAction(fd: FormData): Promise<void> {
 /** ①入荷：受入明細を追加（箱数×入り数=合計 or 合計直接）。 */
 export async function addReceiptLineAction(receiptId: string, fd: FormData): Promise<void> {
   const { companyId } = await requireEntitledSession();
+  await assertReceiptInScope(companyId, receiptId);
   const productId = str(fd, "productId");
   if (!productId) throw new Error("商品を選択してください");
   const perBox = intOrNull(fd, "perBox");
@@ -531,6 +564,7 @@ export async function addReceiptLineAction(receiptId: string, fd: FormData): Pro
 
 export async function deleteReceiptLineAction(receiptId: string, lineId: string): Promise<void> {
   const { companyId } = await requireEntitledSession();
+  await assertReceiptInScope(companyId, receiptId);
   await deleteReceiptLine(companyId, lineId);
   revalidatePath(`/inbound/${receiptId}`);
 }
@@ -545,11 +579,14 @@ export async function putawayAction(fd: FormData): Promise<ActionResult> {
   if (!locationId) return { ok: false, message: "棚入れ先ロケーションを指定してください" };
   if (qty == null || qty <= 0) return { ok: false, message: "数量を正しく入力してください" };
   try {
+    // 棚入れ先も、消し込む入荷も所属工場の中に限定する
+    await assertLocationInScope(companyId, locationId);
     const { qtyAfter } = await putawayProduct(companyId, {
       productId,
       locationId,
       qty,
       operator: resolveOperator(fd, role, userName),
+      siteId: scopeSiteId(await currentSiteScope()),
     });
     revalidatePath("/putaway");
     revalidatePath("/stock");
@@ -660,7 +697,9 @@ export async function deleteWorkplaceAction(id: string): Promise<void> {
 
 /** ヘッダの職場セレクタ: 現在の職場を Cookie に保存し、全画面を再取得させる。 */
 export async function setCurrentWorkplaceAction(workplaceId: string): Promise<void> {
-  await requireSession();
+  const { companyId } = await requireSession();
+  // スコープ外の職場へは切り替えさせない（Cookie を直接書き換えても resolveCurrentWorkplace が弾く）
+  await assertWorkplaceInScope(companyId, workplaceId);
   const c = await cookies();
   c.set(CURRENT_WP_COOKIE, workplaceId, {
     path: "/",
@@ -762,6 +801,12 @@ export async function supplyMoveAction(fd: FormData): Promise<ActionResult> {
   if (destWorkplaceId === wp.id) return { ok: false, message: "移動先が現在の職場と同じです" };
   const dest = await getWorkplace(companyId, destWorkplaceId);
   if (!dest) return { ok: false, message: "移動先の職場が見つかりません" };
+  // 所属工場の外へは移動させない
+  try {
+    await assertWorkplaceInScope(companyId, destWorkplaceId);
+  } catch (e: any) {
+    return { ok: false, message: e?.message ?? "移動先が範囲外です" };
+  }
 
   const fromLoc = await ensureDefaultLocation(companyId, wp.siteId, wp.id);
   const toLoc = await ensureDefaultLocation(companyId, dest.siteId, dest.id);

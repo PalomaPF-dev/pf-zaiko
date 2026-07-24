@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { listWorkplaces, ensureDefaultLocation } from "./db";
+import { currentSiteScope } from "./scope";
 import type { WorkplaceWithSite } from "./types";
 
 /**
@@ -16,17 +17,30 @@ export async function getCurrentWorkplaceId(): Promise<string | null> {
 }
 
 /**
- * 現在の職場を解決する。Cookie の職場が会社に属していれば採用し、
- * 無ければ先頭の職場にフォールバックする（職場未登録なら null）。
+ * 工場スコープを適用した職場一覧。
+ * 一般・作業者は所属工場の職場だけ、管理者・工場未設定は全職場。
+ * 所属工場名に一致する工場(sites)が無いときは空を返す（安全側）。
+ * 職場の切替候補・現在の職場の解決はすべてここを通す（＝スコープの適用漏れを防ぐ）。
+ */
+export async function listScopedWorkplaces(companyId: string): Promise<WorkplaceWithSite[]> {
+  const scope = await currentSiteScope();
+  if (scope && !scope.siteId) return [];
+  return listWorkplaces(companyId, { siteId: scope?.siteId ?? null });
+}
+
+/**
+ * 現在の職場を解決する。Cookie の職場がスコープ内にあれば採用し、
+ * 無ければ先頭の職場にフォールバックする（スコープ内に職場が無ければ null）。
+ * Cookie にスコープ外の職場IDが残っていても採用しない（サーバー側の検証）。
  */
 export async function resolveCurrentWorkplace(companyId: string): Promise<WorkplaceWithSite | null> {
-  const all = await listWorkplaces(companyId);
+  const all = await listScopedWorkplaces(companyId);
   if (all.length === 0) return null;
   const wanted = await getCurrentWorkplaceId();
   return all.find((w) => w.id === wanted) ?? all[0];
 }
 
-/** 現在の職場の既定の置き場ID（副資材の入出庫先）。職場未登録なら null。 */
+/** 現在の職場の既定の置き場ID（副資材の入出庫先）。職場未登録・スコープ内に職場が無ければ null。 */
 export async function currentWorkplaceLocationId(companyId: string): Promise<string | null> {
   const wp = await resolveCurrentWorkplace(companyId);
   if (!wp) return null;

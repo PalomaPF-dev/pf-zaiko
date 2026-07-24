@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { getReceipt, listReceiptLines } from "@/lib/db";
+import { currentScope } from "@/lib/scope";
 import { formatDate, formatDateTime } from "@/lib/format";
 import PrintButton from "@/components/PrintButton";
 import DbErrorState from "@/components/DbErrorState";
@@ -25,9 +26,11 @@ export default async function ReceiptPrintPage({ params }: { params: Promise<{ i
   const session = await requireEntitledSession();
   const { id } = await params;
 
+  const { siteId } = await currentScope();
+
   let receipt, lines;
   try {
-    receipt = await getReceipt(session.companyId, id);
+    receipt = await getReceipt(session.companyId, id, siteId);
     if (!receipt) notFound();
     lines = await listReceiptLines(session.companyId, id);
   } catch (e) {

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Truck, Plus } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { listIssueOrders } from "@/lib/db";
+import { currentScope } from "@/lib/scope";
 import { formatDate } from "@/lib/format";
 import { ISSUE_ORDER_STATUS_LABEL, type IssueOrderStatus } from "@/lib/types";
 import PageHeader from "@/components/PageHeader";
@@ -19,9 +20,11 @@ const STATUS_STYLE: Record<IssueOrderStatus, string> = {
 export default async function IssueOrdersPage() {
   const session = await requireEntitledSession();
 
+  const { siteId } = await currentScope();
+
   let orders;
   try {
-    orders = await listIssueOrders(session.companyId);
+    orders = await listIssueOrders(session.companyId, { siteId });
   } catch (e) {
     console.error("[issue-orders]", e);
     return (

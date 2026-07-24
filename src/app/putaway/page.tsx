@@ -3,6 +3,7 @@ import { AlertTriangle } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { listPendingPutaway, listLocations } from "@/lib/db";
 import { resolveCurrentWorkplace } from "@/lib/workplace";
+import { currentScope } from "@/lib/scope";
 import { putawayAction } from "@/lib/actions";
 import PageHeader from "@/components/PageHeader";
 import DbErrorState from "@/components/DbErrorState";
@@ -25,8 +26,10 @@ export default async function PutawayPage() {
         </div>
       );
     }
+    // 棚入れ候補は自工場で受け入れた入荷分だけ
+    const { siteId } = await currentScope();
     [pending, locations] = await Promise.all([
-      listPendingPutaway(session.companyId),
+      listPendingPutaway(session.companyId, { siteId }),
       listLocations(session.companyId, { workplaceId: workplace.id }),
     ]);
   } catch (e) {

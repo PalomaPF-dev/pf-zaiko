@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -134,6 +134,37 @@ function Brand() {
   );
 }
 
+/**
+ * 部署（工場）スコープの表示。ポータルの部署が工場のとき、一般・作業者は自工場のデータだけを見る。
+ * 所属工場が工場マスタ（sites）に無い場合は「表示できるデータが無い」ことを伝える。
+ * 所属工場は JWT に載せず都度サーバーで判定するため、職場セレクタと同じAPIから受け取る。
+ */
+function FactoryScopeNote() {
+  const [scope, setScope] = useState<{ factory: string; matched: boolean } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/workplaces")
+      .then((r) => r.json())
+      .then((d) => {
+        if (alive) setScope(d.scope ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (!scope) return null;
+  return (
+    <div className="mb-2 text-[10px] leading-snug text-slate-400">
+      {scope.matched
+        ? `${scope.factory}のデータのみ表示`
+        : `${scope.factory}は工場マスタに未登録のため表示できるデータがありません`}
+    </div>
+  );
+}
+
 function UserFooter() {
   const { data: session } = useSession();
   if (!session?.user) return null;
@@ -151,6 +182,7 @@ function UserFooter() {
           {session.user.role === "admin" ? "管理者" : session.user.role === "worker" ? "作業者" : "一般"}
         </span>
       </div>
+      <FactoryScopeNote />
       <button
         onClick={() => { void signOut({ redirect: false }).then(() => { window.location.href = "https://portal.paloma-pf.com/"; }); }}
         className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"

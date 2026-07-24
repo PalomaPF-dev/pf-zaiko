@@ -47,6 +47,9 @@ export async function ensureAuthSchema(): Promise<void> {
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS pending BOOLEAN NOT NULL DEFAULT false`;
   // 承認者の社員番号（ポータル provision v2 で連携・冪等追加）。NULL = 未設定。
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS approver_login_id TEXT`;
+  // 所属工場（ポータルの部署が「工場」種別のときだけ値が入る）。NULL = 未設定＝全工場を閲覧可。
+  // 一般・作業者で factory が非NULLのユーザーは、その工場（sites）配下のデータだけを閲覧できる。
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS factory TEXT`;
   // 社員番号ログイン（login_id）への移行。email は任意（社内は未登録の社員が多い）。
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS login_id TEXT`;
   await sql`CREATE UNIQUE INDEX IF NOT EXISTS users_login_id_idx ON users(login_id)`;
@@ -168,14 +171,15 @@ export async function createInvitedUser(
   name: string,
   role: UserRole,
   email: string | null = null,
-  approverLoginId: string | null = null
+  approverLoginId: string | null = null,
+  factory: string | null = null
 ): Promise<string> {
   const sql = getSql();
   // ランダムな使えないパスワード（招待完了までログイン不可）
   const passwordHash = await bcrypt.hash(crypto.randomBytes(24).toString("hex"), 12);
   const rows = await sql`
-    INSERT INTO users (company_id, login_id, email, name, password_hash, role, pending, approver_login_id)
-    VALUES (${companyId}, ${loginId}, ${email}, ${name}, ${passwordHash}, ${role}, true, ${approverLoginId})
+    INSERT INTO users (company_id, login_id, email, name, password_hash, role, pending, approver_login_id, factory)
+    VALUES (${companyId}, ${loginId}, ${email}, ${name}, ${passwordHash}, ${role}, true, ${approverLoginId}, ${factory})
     RETURNING id`;
   return rows[0].id as string;
 }
@@ -223,6 +227,32 @@ export async function getUserRole(companyId: string, userId: string): Promise<Us
     SELECT role FROM users WHERE company_id = ${companyId} AND id = ${userId} LIMIT 1`;
   if (!rows[0]) return null;
   return ((rows[0] as { role: string | null }).role ?? "admin") as UserRole;
+}
+
+/**
+ * ユーザーの役割と所属工場を1クエリで取得（存在しなければ role/factory とも null）。
+ * 既存DBに factory 列が未追加のままセッション処理が先に走った場合（42703: undefined_column）は
+ * ensureAuthSchema で冪等追加してから1回だけリトライする。
+ */
+export async function getUserRoleAndFactory(
+  userId: string
+): Promise<{ role: UserRole | null; factory: string | null }> {
+  const sql = getSql();
+  let rows;
+  try {
+    rows = await sql`SELECT role, factory FROM users WHERE id = ${userId} LIMIT 1`;
+  } catch (e: unknown) {
+    const code = (e as { code?: string; sourceError?: { code?: string } })?.code
+      ?? (e as { sourceError?: { code?: string } })?.sourceError?.code;
+    if (code !== "42703") throw e;
+    await ensureAuthSchema();
+    rows = await sql`SELECT role, factory FROM users WHERE id = ${userId} LIMIT 1`;
+  }
+  if (rows.length === 0) return { role: null, factory: null };
+  return {
+    role: ((rows[0] as { role: string | null }).role ?? "member") as UserRole,
+    factory: ((rows[0] as { factory: string | null }).factory ?? null) || null,
+  };
 }
 
 /** 会社内の管理者数（最後の管理者を消さないためのチェックに使う）。 */

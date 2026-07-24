@@ -266,6 +266,10 @@ async function buildSchema(): Promise<void> {
       created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS stocktakes_company_status_idx ON stocktakes(company_id, status, created_at DESC)`);
+  // 実施した工場（作成時の「現在の職場」から記録）。工場スコープの絞り込みに使う。
+  // NULL＝工場不明（この機能より前に作られた棚卸）。工場所属ユーザーには見せない（安全側）。
+  await safeDdl(() => sql`ALTER TABLE stocktakes ADD COLUMN IF NOT EXISTS site_id UUID REFERENCES sites(id) ON DELETE SET NULL`);
+  await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS stocktakes_site_idx ON stocktakes(company_id, site_id)`);
 
   // --- 棚卸明細（商品×ロケ 1行） ---
   await safeDdl(() => sql`
@@ -301,6 +305,9 @@ async function buildSchema(): Promise<void> {
       UNIQUE (company_id, order_no)
     )`);
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS issue_orders_company_status_idx ON issue_orders(company_id, status, created_at DESC)`);
+  // 出庫元の工場（作成時の「現在の職場」から記録）。工場スコープの絞り込みに使う（NULL＝工場不明）。
+  await safeDdl(() => sql`ALTER TABLE issue_orders ADD COLUMN IF NOT EXISTS site_id UUID REFERENCES sites(id) ON DELETE SET NULL`);
+  await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS issue_orders_site_idx ON issue_orders(company_id, site_id)`);
 
   // --- 出庫指示 明細（商品×引当ロケ×数量） ---
   await safeDdl(() => sql`
@@ -339,6 +346,10 @@ async function buildSchema(): Promise<void> {
       UNIQUE (company_id, receipt_no)
     )`);
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS receipts_company_status_idx ON receipts(company_id, status, created_at DESC)`);
+  // 受け入れた工場（作成時の「現在の職場」から記録）。工場スコープの絞り込みに使う（NULL＝工場不明）。
+  // 未入庫（棚入れ待ち）の集計もこの列で絞るため、他工場の入荷が棚入れ候補に出てこない。
+  await safeDdl(() => sql`ALTER TABLE receipts ADD COLUMN IF NOT EXISTS site_id UUID REFERENCES sites(id) ON DELETE SET NULL`);
+  await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS receipts_site_idx ON receipts(company_id, site_id)`);
 
   // --- 受入明細（商品×受入数。ロケ未定＝未入庫。②入庫で qty_putaway を消し込む） ---
   await safeDdl(() => sql`
@@ -380,4 +391,125 @@ async function buildSchema(): Promise<void> {
       UNIQUE (company_id, name)
     )`);
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS workers_company_idx ON workers(company_id, created_at)`);
+
+  // 工場スコープ導入で追加した site_id を、既存データに一度だけ補完する
+  await backfillDocumentSites();
+}
+
+/**
+ * バックフィル用。失敗しても起動を止めない（次回の ensureSchema で再試行される）。
+ * DDL ではないので safeDdl とは別立てだが、「落とさない」流儀は同じ。
+ */
+async function safeBackfill(label: string, run: () => Promise<unknown>): Promise<void> {
+  try {
+    await run();
+  } catch (e) {
+    console.error(`[schema] backfill ${label} failed (skipped):`, e);
+  }
+}
+
+/**
+ * 工場スコープ導入時の一度きりのバックフィル（冪等）。
+ *
+ * receipts / issue_orders / stocktakes に site_id を新設したが、既存行は NULL のため
+ * 工場所属ユーザーからは既存の入荷・出庫・棚卸がすべて見えなくなってしまう。
+ * 各伝票の明細が指す置き場（locations）から 職場(workplaces) → 工場(sites) を辿って補完する。
+ *
+ * - 明細が複数の工場にまたがる伝票は「明細数が最も多い工場」に寄せる（同数なら工場ID順で先頭＝再実行しても同じ結果）。
+ * - 明細が無い／置き場から工場を辿れない伝票は NULL のまま（解決不能。管理者のみ閲覧可）。
+ * - pf_migrations（authDb 側で作成）で一度きりにしつつ、UPDATE 自体も `site_id IS NULL` 条件付きで
+ *   何度実行しても壊れない形にしている。
+ */
+async function backfillDocumentSites(): Promise<void> {
+  const sql = getSql();
+  const MIGRATION_KEY = "backfill_doc_site_id_v1";
+
+  await safeBackfill(MIGRATION_KEY, async () => {
+    const applied = await sql`SELECT 1 FROM pf_migrations WHERE key = ${MIGRATION_KEY} LIMIT 1`;
+    if (applied.length > 0) return;
+
+    // 0) 置き場の工場を職場から補完。locations.site_id が NULL でも workplace_id が
+    //    埋まっている行があり得るため、先に揃えておく（読み取り側は locations.site_id で絞るため）。
+    await sql`
+      UPDATE locations l SET site_id = w.site_id
+      FROM workplaces w
+      WHERE l.workplace_id = w.id AND l.site_id IS NULL AND w.site_id IS NOT NULL`;
+
+    // 1) 棚卸: stocktake_lines.location_id → locations → (workplaces) → sites
+    await sql`
+      WITH ranked AS (
+        SELECT sl.stocktake_id AS doc_id,
+               COALESCE(l.site_id, w.site_id) AS site_id,
+               COUNT(*) AS n
+        FROM stocktake_lines sl
+        JOIN locations l ON l.id = sl.location_id
+        LEFT JOIN workplaces w ON w.id = l.workplace_id
+        WHERE COALESCE(l.site_id, w.site_id) IS NOT NULL
+        GROUP BY 1, 2
+      ), pick AS (
+        SELECT DISTINCT ON (doc_id) doc_id, site_id
+        FROM ranked ORDER BY doc_id, n DESC, site_id
+      )
+      UPDATE stocktakes s SET site_id = pick.site_id
+      FROM pick WHERE s.id = pick.doc_id AND s.site_id IS NULL`;
+
+    // 2) 出庫指示: issue_order_lines.location_id → locations → (workplaces) → sites
+    //    引当前の明細は location_id が NULL なので、JOIN で自然に除外される。
+    await sql`
+      WITH ranked AS (
+        SELECT il.order_id AS doc_id,
+               COALESCE(l.site_id, w.site_id) AS site_id,
+               COUNT(*) AS n
+        FROM issue_order_lines il
+        JOIN locations l ON l.id = il.location_id
+        LEFT JOIN workplaces w ON w.id = l.workplace_id
+        WHERE COALESCE(l.site_id, w.site_id) IS NOT NULL
+        GROUP BY 1, 2
+      ), pick AS (
+        SELECT DISTINCT ON (doc_id) doc_id, site_id
+        FROM ranked ORDER BY doc_id, n DESC, site_id
+      )
+      UPDATE issue_orders o SET site_id = pick.site_id
+      FROM pick WHERE o.id = pick.doc_id AND o.site_id IS NULL`;
+
+    // 3) 入荷（受入）: receipt_lines は「入荷時点ではロケ未定」の設計で location_id を持たない。
+    //    唯一ロケに繋がるのは②入庫（棚入れ）の受払で、そこに受入伝票No が ref_no として残っている
+    //    （putawayProduct が ref_no = receipts.receipt_no を記録。receipt_no は会社内で一意）。
+    //    → 一度も棚入れしていない受入伝票は解決できず NULL のまま。
+    await sql`
+      WITH ranked AS (
+        SELECT r.id AS doc_id,
+               COALESCE(l.site_id, w.site_id) AS site_id,
+               COUNT(*) AS n
+        FROM receipts r
+        JOIN transactions t
+          ON t.company_id = r.company_id AND t.tx_type = 'putaway' AND t.ref_no = r.receipt_no
+        JOIN locations l ON l.id = t.location_id
+        LEFT JOIN workplaces w ON w.id = l.workplace_id
+        WHERE COALESCE(l.site_id, w.site_id) IS NOT NULL
+        GROUP BY 1, 2
+      ), pick AS (
+        SELECT DISTINCT ON (doc_id) doc_id, site_id
+        FROM ranked ORDER BY doc_id, n DESC, site_id
+      )
+      UPDATE receipts r SET site_id = pick.site_id
+      FROM pick WHERE r.id = pick.doc_id AND r.site_id IS NULL`;
+
+    // 4) 工場が1つしかない会社は、残った未解決の伝票もその工場で確定できる（曖昧さが無い）。
+    //    これで「一度も棚入れしていない入荷」など、明細から辿れない伝票も救われる。
+    await sql`
+      UPDATE receipts d SET site_id = s.id FROM sites s
+      WHERE d.site_id IS NULL AND s.company_id = d.company_id
+        AND (SELECT COUNT(*) FROM sites s2 WHERE s2.company_id = d.company_id) = 1`;
+    await sql`
+      UPDATE issue_orders d SET site_id = s.id FROM sites s
+      WHERE d.site_id IS NULL AND s.company_id = d.company_id
+        AND (SELECT COUNT(*) FROM sites s2 WHERE s2.company_id = d.company_id) = 1`;
+    await sql`
+      UPDATE stocktakes d SET site_id = s.id FROM sites s
+      WHERE d.site_id IS NULL AND s.company_id = d.company_id
+        AND (SELECT COUNT(*) FROM sites s2 WHERE s2.company_id = d.company_id) = 1`;
+
+    await sql`INSERT INTO pf_migrations (key) VALUES (${MIGRATION_KEY}) ON CONFLICT DO NOTHING`;
+  });
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowDownToLine, Plus } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { listReceipts } from "@/lib/db";
+import { currentScope } from "@/lib/scope";
 import { formatDate } from "@/lib/format";
 import { RECEIPT_STATUS_LABEL, type ReceiptStatus } from "@/lib/types";
 import PageHeader from "@/components/PageHeader";
@@ -18,9 +19,11 @@ const STATUS_STYLE: Record<ReceiptStatus, string> = {
 export default async function InboundPage() {
   const session = await requireEntitledSession();
 
+  const { siteId } = await currentScope();
+
   let receipts;
   try {
-    receipts = await listReceipts(session.companyId);
+    receipts = await listReceipts(session.companyId, { siteId });
   } catch (e) {
     console.error("[inbound]", e);
     return (

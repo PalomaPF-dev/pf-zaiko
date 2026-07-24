@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { getStocktake, listStocktakeLines } from "@/lib/db";
+import { currentScope } from "@/lib/scope";
 import { toCsv } from "@/lib/csv";
 import { todayJST } from "@/lib/format";
 
@@ -13,7 +14,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!session?.user?.companyId) return new Response("unauthorized", { status: 401 });
   const { id } = await params;
 
-  const take = await getStocktake(session.user.companyId, id);
+  const { siteId } = await currentScope();
+  const take = await getStocktake(session.user.companyId, id, siteId);
   if (!take) return new Response("not found", { status: 404 });
   const lines = await listStocktakeLines(session.user.companyId, id);
 

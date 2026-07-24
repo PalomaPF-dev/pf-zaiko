@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import { ArrowLeft } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { getTransaction, getProduct } from "@/lib/db";
+import { currentScope } from "@/lib/scope";
 import { productLabelCode } from "@/lib/types";
 import { productQrPayload } from "@/lib/qr";
 import { formatDate } from "@/lib/format";
@@ -18,9 +19,11 @@ export default async function ReceiptTagPage({ params }: { params: Promise<{ txI
   const session = await requireEntitledSession();
   const { txId } = await params;
 
+  const { siteId } = await currentScope();
+
   let tx, product;
   try {
-    tx = await getTransaction(session.companyId, txId);
+    tx = await getTransaction(session.companyId, txId, siteId);
     product = tx ? await getProduct(session.companyId, tx.productId) : null;
   } catch (e) {
     console.error("[receipt tag]", e);
