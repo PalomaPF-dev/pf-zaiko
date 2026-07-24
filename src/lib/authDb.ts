@@ -2,12 +2,13 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { getSql } from "./neon";
 
-/** ユーザーの役割。admin=管理者（承認・ユーザー管理が可能）、member=一般（検査・閲覧） */
-export type UserRole = "admin" | "member";
+/** ユーザーの役割。admin=管理者（承認・ユーザー管理が可能）、member=一般（検査・閲覧）、worker=作業者（本人名で記録） */
+export type UserRole = "admin" | "member" | "worker";
 
 export const USER_ROLE_LABEL: Record<UserRole, string> = {
   admin: "管理者",
   member: "一般",
+  worker: "作業者",
 };
 
 /** 認証用テーブル（companies/users）を冪等に作成。空DBでも自動初期化されるようにする。 */

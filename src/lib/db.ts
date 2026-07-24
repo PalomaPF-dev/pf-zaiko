@@ -1688,7 +1688,9 @@ export async function putawayProduct(
   return { qtyAfter: after };
 }
 
-// ===== 作業者（アプリ内名簿。アカウントとは独立） =====
+// ===== 作業者（users.role='worker' のアカウント） =====
+// 旧 workers テーブル（名前だけの名簿）は廃止（データは残置）。
+// 作業者アカウントはポータルのユーザー設定で発行・管理する。
 
 export interface Worker {
   id: string;
@@ -1696,14 +1698,14 @@ export interface Worker {
   createdAt: string;
 }
 
-/** 会社の作業者一覧（登録順）。 */
+/** 会社の作業者アカウント一覧（名前順）。 */
 export async function listWorkers(companyId: string): Promise<Worker[]> {
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
-    SELECT id, name, created_at FROM workers
-    WHERE company_id = ${companyId}
-    ORDER BY created_at ASC, name ASC`;
+    SELECT id, name, created_at FROM users
+    WHERE company_id = ${companyId} AND role = 'worker'
+    ORDER BY name ASC`;
   return rows.map((r: any) => ({ id: r.id, name: r.name, createdAt: tsStr(r.created_at) }));
 }
 

@@ -148,7 +148,7 @@ function UserFooter() {
             session.user.role === "admin" ? "bg-[#d44fe6]/5 text-[#d44fe6]" : "bg-slate-100 text-slate-500"
           }`}
         >
-          {session.user.role === "admin" ? "管理者" : "一般"}
+          {session.user.role === "admin" ? "管理者" : session.user.role === "worker" ? "作業者" : "一般"}
         </span>
       </div>
       <button

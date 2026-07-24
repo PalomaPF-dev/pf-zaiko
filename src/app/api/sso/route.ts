@@ -101,7 +101,7 @@ export async function GET(req: Request) {
         companyName: user.company_name as string,
         isDemo: Boolean(user.is_demo),
         // 役割導入前のユーザー（role 未設定）は管理者として扱う（authorize と同じ）
-        role: (user.role ?? "admin") as "admin" | "member",
+        role: (user.role ?? "admin") as "admin" | "member" | "worker",
       },
       secret,
       maxAge: SESSION_MAX_AGE,

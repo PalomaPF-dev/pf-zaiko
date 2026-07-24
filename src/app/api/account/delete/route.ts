@@ -39,7 +39,7 @@ export async function POST() {
     if (!me) {
       return NextResponse.json({ message: "ユーザーが見つかりません。" }, { status: 404 });
     }
-    const myRole = (me.role ?? "admin") as "admin" | "member";
+    const myRole = (me.role ?? "admin") as "admin" | "member" | "worker";
 
     const countRows = await sql`
       SELECT

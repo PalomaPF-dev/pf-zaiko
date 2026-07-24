@@ -7,7 +7,7 @@ declare module "next-auth" {
       id: string;
       companyId: string;
       companyName: string;
-      role: "admin" | "member";
+      role: "admin" | "member" | "worker";
       isDemo?: boolean;
       name?: string | null;
       email?: string | null;
@@ -17,7 +17,7 @@ declare module "next-auth" {
   interface User {
     companyId: string;
     companyName: string;
-    role: "admin" | "member";
+    role: "admin" | "member" | "worker";
     isDemo?: boolean;
   }
 }
@@ -27,7 +27,7 @@ declare module "next-auth/jwt" {
     id: string;
     companyId: string;
     companyName: string;
-    role: "admin" | "member";
+    role: "admin" | "member" | "worker";
     isDemo?: boolean;
   }
 }
