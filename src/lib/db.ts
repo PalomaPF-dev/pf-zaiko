@@ -185,14 +185,42 @@ export async function listWorkplaceAreas(
   return rows.map((r: any) => ({ area: r.area, locationCount: r.n }));
 }
 
-/** 工場一覧（並び順） */
-export async function listSites(companyId: string): Promise<Site[]> {
+/** 工場一覧（並び順）。opts.siteId 指定時はその1工場だけ（工場スコープ用）。 */
+export async function listSites(
+  companyId: string,
+  opts: { siteId?: string | null } = {},
+): Promise<Site[]> {
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
-    SELECT * FROM sites WHERE company_id = ${companyId}
+    SELECT * FROM sites
+    WHERE company_id = ${companyId}
+      AND (${opts.siteId ?? null}::uuid IS NULL OR id = ${opts.siteId ?? null})
     ORDER BY sort_order, name`;
   return rows.map(mapSite);
+}
+
+/**
+ * 工場名（ポータルの部署名）から工場IDを引く。前後の空白は無視して完全一致。
+ * 一致する工場が無ければ null（＝そのユーザーに見せられるデータが無い＝空表示）。
+ */
+export async function findSiteIdByName(companyId: string, name: string): Promise<string | null> {
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT id FROM sites
+    WHERE company_id = ${companyId} AND btrim(name) = btrim(${name})
+    ORDER BY sort_order, name LIMIT 1`;
+  return (rows[0]?.id as string) ?? null;
+}
+
+/** 置き場（ロケーション）が属する工場ID（未設定・存在しなければ null）。書き込みのスコープ検証に使う。 */
+export async function getLocationSiteId(companyId: string, locationId: string): Promise<string | null> {
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT site_id FROM locations WHERE company_id = ${companyId} AND id = ${locationId} LIMIT 1`;
+  return (rows[0]?.site_id as string | null) ?? null;
 }
 
 /** 職場一覧（工場名つき。工場→職場の並び順） */
@@ -507,11 +535,19 @@ export async function getLocation(companyId: string, id: string): Promise<Locati
   return rows[0] ? mapLocation(rows[0]) : null;
 }
 
-export async function getLocationByCode(companyId: string, code: string): Promise<Location | null> {
+/** ロケ番号で1件取得。siteId 指定時はその工場の置き場に限る（工場スコープ）。 */
+export async function getLocationByCode(
+  companyId: string,
+  code: string,
+  siteId: string | null = null,
+): Promise<Location | null> {
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
-    SELECT * FROM locations WHERE company_id = ${companyId} AND code = ${code.toUpperCase()} LIMIT 1`;
+    SELECT * FROM locations
+    WHERE company_id = ${companyId} AND code = ${code.toUpperCase()}
+      AND (${siteId}::uuid IS NULL OR site_id = ${siteId})
+    LIMIT 1`;
   return rows[0] ? mapLocation(rows[0]) : null;
 }
 
@@ -616,6 +652,7 @@ export interface StockFilter {
   productId?: string | null;
   locationId?: string | null;
   workplaceId?: string | null; // 副資材: この職場（の置き場）の在庫だけに絞る
+  siteId?: string | null; // 工場スコープ: この工場の置き場の在庫だけに絞る
   area?: string | null;
   search?: string | null;
   belowSafetyOnly?: boolean;
@@ -639,6 +676,7 @@ export async function listStock(companyId: string, filter: StockFilter = {}): Pr
       AND (${filter.productId ?? null}::uuid IS NULL OR st.product_id = ${filter.productId ?? null})
       AND (${filter.locationId ?? null}::uuid IS NULL OR st.location_id = ${filter.locationId ?? null})
       AND (${filter.workplaceId ?? null}::uuid IS NULL OR l.workplace_id = ${filter.workplaceId ?? null})
+      AND (${filter.siteId ?? null}::uuid IS NULL OR l.site_id = ${filter.siteId ?? null})
       AND (${filter.area ?? null}::text IS NULL OR l.area = ${filter.area ?? null})
       AND (${filter.nonZeroOnly ? true : null}::boolean IS NULL OR st.qty <> 0)
       AND (${like}::text IS NULL OR p.name ILIKE ${like} OR p.maker_code ILIKE ${like} OR p.drawing_no ILIKE ${like} OR l.code ILIKE ${like})
@@ -650,9 +688,13 @@ export async function listStock(companyId: string, filter: StockFilter = {}): Pr
   return mapped;
 }
 
-/** 特定商品のロケ別在庫（商品詳細用）。 */
-export async function listStockForProduct(companyId: string, productId: string): Promise<StockWithMeta[]> {
-  return listStock(companyId, { productId, nonZeroOnly: false });
+/** 特定商品のロケ別在庫（商品詳細用）。siteId 指定時はその工場の置き場だけ。 */
+export async function listStockForProduct(
+  companyId: string,
+  productId: string,
+  siteId: string | null = null,
+): Promise<StockWithMeta[]> {
+  return listStock(companyId, { productId, siteId, nonZeroOnly: false });
 }
 
 /** 特定ロケの在庫一覧（ロケ照会用）。 */
@@ -816,6 +858,7 @@ export interface TxFilter {
   productId?: string | null;
   locationId?: string | null;
   workplaceId?: string | null; // 副資材: この職場（の置き場）の受払だけに絞る
+  siteId?: string | null; // 工場スコープ: この工場の置き場の受払だけに絞る
   txType?: TxType | null;
   dateFrom?: string | null; // YYYY-MM-DD（JST）
   dateTo?: string | null;
@@ -838,6 +881,7 @@ export async function listTransactions(companyId: string, filter: TxFilter = {})
       AND (${filter.productId ?? null}::uuid IS NULL OR t.product_id = ${filter.productId ?? null})
       AND (${filter.locationId ?? null}::uuid IS NULL OR t.location_id = ${filter.locationId ?? null})
       AND (${filter.workplaceId ?? null}::uuid IS NULL OR l.workplace_id = ${filter.workplaceId ?? null})
+      AND (${filter.siteId ?? null}::uuid IS NULL OR l.site_id = ${filter.siteId ?? null})
       AND (${filter.txType ?? null}::text IS NULL OR t.tx_type = ${filter.txType ?? null})
       AND (${fromTs}::timestamptz IS NULL OR t.created_at >= ${fromTs})
       AND (${toTs}::timestamptz IS NULL OR t.created_at <= ${toTs})
@@ -846,8 +890,12 @@ export async function listTransactions(companyId: string, filter: TxFilter = {})
   return rows.map(mapTxWithMeta);
 }
 
-/** 受払1件を商品・ロケ情報つきで取得（入荷現品票の再発行用）。 */
-export async function getTransaction(companyId: string, id: string): Promise<TransactionWithMeta | null> {
+/** 受払1件を商品・ロケ情報つきで取得（入荷現品票の再発行用）。siteId 指定時はその工場の受払だけ。 */
+export async function getTransaction(
+  companyId: string,
+  id: string,
+  siteId: string | null = null,
+): Promise<TransactionWithMeta | null> {
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
@@ -855,7 +903,9 @@ export async function getTransaction(companyId: string, id: string): Promise<Tra
     FROM transactions t
     JOIN products p ON p.id = t.product_id
     JOIN locations l ON l.id = t.location_id
-    WHERE t.company_id = ${companyId} AND t.id = ${id} LIMIT 1`;
+    WHERE t.company_id = ${companyId} AND t.id = ${id}
+      AND (${siteId}::uuid IS NULL OR l.site_id = ${siteId})
+    LIMIT 1`;
   return rows[0] ? mapTxWithMeta(rows[0]) : null;
 }
 
@@ -873,7 +923,11 @@ function mapStocktake(r: any): Stocktake {
   };
 }
 
-export async function listStocktakes(companyId: string): Promise<StocktakeWithProgress[]> {
+/** 棚卸一覧。opts.siteId 指定時はその工場で実施した棚卸だけ（工場スコープ）。 */
+export async function listStocktakes(
+  companyId: string,
+  opts: { siteId?: string | null } = {},
+): Promise<StocktakeWithProgress[]> {
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
@@ -883,6 +937,7 @@ export async function listStocktakes(companyId: string): Promise<StocktakeWithPr
       (SELECT COUNT(*) FROM stocktake_lines sl WHERE sl.stocktake_id = s.id AND sl.diff IS NOT NULL AND sl.diff <> 0) AS diff_count
     FROM stocktakes s
     WHERE s.company_id = ${companyId}
+      AND (${opts.siteId ?? null}::uuid IS NULL OR s.site_id = ${opts.siteId ?? null})
     ORDER BY s.created_at DESC`;
   return rows.map((r: any) => ({
     ...mapStocktake(r),
@@ -892,10 +947,19 @@ export async function listStocktakes(companyId: string): Promise<StocktakeWithPr
   }));
 }
 
-export async function getStocktake(companyId: string, id: string): Promise<Stocktake | null> {
+/** 棚卸1件。siteId 指定時は他工場の棚卸を開けない（null が返る＝404 相当）。 */
+export async function getStocktake(
+  companyId: string,
+  id: string,
+  siteId: string | null = null,
+): Promise<Stocktake | null> {
   await ensureSchema();
   const sql = getSql();
-  const rows = await sql`SELECT * FROM stocktakes WHERE company_id = ${companyId} AND id = ${id} LIMIT 1`;
+  const rows = await sql`
+    SELECT * FROM stocktakes
+    WHERE company_id = ${companyId} AND id = ${id}
+      AND (${siteId}::uuid IS NULL OR site_id = ${siteId})
+    LIMIT 1`;
   return rows[0] ? mapStocktake(rows[0]) : null;
 }
 
@@ -932,15 +996,15 @@ export async function listStocktakeLines(companyId: string, stocktakeId: string)
  */
 export async function createStocktake(
   companyId: string,
-  input: { title: string; workplaceId: string; scopeLabel: string | null; createdBy: string }
+  input: { title: string; workplaceId: string; siteId: string | null; scopeLabel: string | null; createdBy: string }
 ): Promise<string> {
   await ensureSchema();
   const sql = getSql();
   const stId = randomUUID();
-  // scope_area 列に対象職場の表示名を保存（一覧・詳細の表示用）
+  // scope_area 列に対象職場の表示名を保存（一覧・詳細の表示用）。site_id は工場スコープの絞り込み用。
   await sql`
-    INSERT INTO stocktakes (id, company_id, title, scope_area, status, created_by)
-    VALUES (${stId}, ${companyId}, ${input.title}, ${input.scopeLabel}, 'counting', ${input.createdBy})`;
+    INSERT INTO stocktakes (id, company_id, title, scope_area, status, created_by, site_id)
+    VALUES (${stId}, ${companyId}, ${input.title}, ${input.scopeLabel}, 'counting', ${input.createdBy}, ${input.siteId})`;
   // 現在の職場（の置き場）の在庫を帳簿数として明細へコピー
   await sql`
     INSERT INTO stocktake_lines (company_id, stocktake_id, product_id, location_id, book_qty)
@@ -1108,15 +1172,16 @@ export interface IssueOrderInput {
   shipDate: string | null;
   pickDate: string | null;
   createdBy: string;
+  siteId?: string | null; // 出庫元の工場（工場スコープの絞り込み用）
 }
 
 export async function createIssueOrder(companyId: string, input: IssueOrderInput): Promise<string> {
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
-    INSERT INTO issue_orders (company_id, order_no, customer, deliver_to, ship_group, ship_date, pick_date, created_by)
+    INSERT INTO issue_orders (company_id, order_no, customer, deliver_to, ship_group, ship_date, pick_date, created_by, site_id)
     VALUES (${companyId}, ${input.orderNo}, ${input.customer}, ${input.deliverTo}, ${input.shipGroup},
-            ${input.shipDate}, ${input.pickDate}, ${input.createdBy})
+            ${input.shipDate}, ${input.pickDate}, ${input.createdBy}, ${input.siteId ?? null})
     RETURNING id`;
   return rows[0].id as string;
 }
@@ -1166,7 +1231,11 @@ export async function deleteIssueOrderLine(companyId: string, lineId: string): P
   await sql`DELETE FROM issue_order_lines WHERE company_id = ${companyId} AND id = ${lineId}`;
 }
 
-export async function listIssueOrders(companyId: string): Promise<IssueOrderWithProgress[]> {
+/** 出庫指示一覧。opts.siteId 指定時はその工場の出庫だけ（工場スコープ）。 */
+export async function listIssueOrders(
+  companyId: string,
+  opts: { siteId?: string | null } = {},
+): Promise<IssueOrderWithProgress[]> {
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
@@ -1175,6 +1244,7 @@ export async function listIssueOrders(companyId: string): Promise<IssueOrderWith
       (SELECT COUNT(*) FROM issue_order_lines l WHERE l.order_id = o.id AND l.qty_issued >= l.qty_instructed AND l.qty_instructed > 0) AS issued_count
     FROM issue_orders o
     WHERE o.company_id = ${companyId}
+      AND (${opts.siteId ?? null}::uuid IS NULL OR o.site_id = ${opts.siteId ?? null})
     ORDER BY o.created_at DESC`;
   return rows.map((r: any) => ({
     ...mapIssueOrder(r),
@@ -1183,10 +1253,19 @@ export async function listIssueOrders(companyId: string): Promise<IssueOrderWith
   }));
 }
 
-export async function getIssueOrder(companyId: string, id: string): Promise<IssueOrder | null> {
+/** 出庫指示1件。siteId 指定時は他工場の出庫を開けない。 */
+export async function getIssueOrder(
+  companyId: string,
+  id: string,
+  siteId: string | null = null,
+): Promise<IssueOrder | null> {
   await ensureSchema();
   const sql = getSql();
-  const rows = await sql`SELECT * FROM issue_orders WHERE company_id = ${companyId} AND id = ${id} LIMIT 1`;
+  const rows = await sql`
+    SELECT * FROM issue_orders
+    WHERE company_id = ${companyId} AND id = ${id}
+      AND (${siteId}::uuid IS NULL OR site_id = ${siteId})
+    LIMIT 1`;
   return rows[0] ? mapIssueOrder(rows[0]) : null;
 }
 
@@ -1458,14 +1537,14 @@ export async function nextReceiptNo(companyId: string): Promise<string> {
 /** 受入伝票を作成（納入場所を指定）。receipt_no は自動採番。 */
 export async function createReceipt(
   companyId: string,
-  input: { deliverTo: string | null; createdBy: string }
+  input: { deliverTo: string | null; createdBy: string; siteId?: string | null }
 ): Promise<{ id: string; receiptNo: string }> {
   await ensureSchema();
   const sql = getSql();
   const receiptNo = await nextReceiptNo(companyId);
   const rows = await sql`
-    INSERT INTO receipts (company_id, receipt_no, deliver_to, created_by)
-    VALUES (${companyId}, ${receiptNo}, ${input.deliverTo}, ${input.createdBy})
+    INSERT INTO receipts (company_id, receipt_no, deliver_to, created_by, site_id)
+    VALUES (${companyId}, ${receiptNo}, ${input.deliverTo}, ${input.createdBy}, ${input.siteId ?? null})
     RETURNING id`;
   return { id: rows[0].id as string, receiptNo };
 }
@@ -1487,7 +1566,11 @@ export async function addReceiptLine(
     VALUES (${companyId}, ${receiptId}, ${seq}, ${input.productId}, ${supplier}, ${input.perBox}, ${input.boxCount}, ${input.qty}, ${input.refNo})`;
 }
 
-export async function listReceipts(companyId: string): Promise<ReceiptWithProgress[]> {
+/** 入荷（受入）一覧。opts.siteId 指定時はその工場で受け入れた分だけ（工場スコープ）。 */
+export async function listReceipts(
+  companyId: string,
+  opts: { siteId?: string | null } = {},
+): Promise<ReceiptWithProgress[]> {
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
@@ -1497,6 +1580,7 @@ export async function listReceipts(companyId: string): Promise<ReceiptWithProgre
       (SELECT COALESCE(SUM(l.qty), 0) FROM receipt_lines l WHERE l.receipt_id = r.id) AS total_qty
     FROM receipts r
     WHERE r.company_id = ${companyId}
+      AND (${opts.siteId ?? null}::uuid IS NULL OR r.site_id = ${opts.siteId ?? null})
     ORDER BY r.created_at DESC`;
   return rows.map((r: any) => ({
     ...mapReceipt(r),
@@ -1506,10 +1590,19 @@ export async function listReceipts(companyId: string): Promise<ReceiptWithProgre
   }));
 }
 
-export async function getReceipt(companyId: string, id: string): Promise<Receipt | null> {
+/** 入荷（受入）1件。siteId 指定時は他工場の受入伝票を開けない。 */
+export async function getReceipt(
+  companyId: string,
+  id: string,
+  siteId: string | null = null,
+): Promise<Receipt | null> {
   await ensureSchema();
   const sql = getSql();
-  const rows = await sql`SELECT * FROM receipts WHERE company_id = ${companyId} AND id = ${id} LIMIT 1`;
+  const rows = await sql`
+    SELECT * FROM receipts
+    WHERE company_id = ${companyId} AND id = ${id}
+      AND (${siteId}::uuid IS NULL OR site_id = ${siteId})
+    LIMIT 1`;
   return rows[0] ? mapReceipt(rows[0]) : null;
 }
 
@@ -1575,8 +1668,14 @@ export async function markReceiptLinesLabelPrinted(companyId: string, ids: strin
   await sql`UPDATE receipt_lines SET label_printed = true WHERE company_id = ${companyId} AND id = ANY(${ids}::uuid[])`;
 }
 
-/** 未入庫（棚入れ待ち）を商品ごとに集計（②入庫の候補一覧）。 */
-export async function listPendingPutaway(companyId: string): Promise<PendingPutaway[]> {
+/**
+ * 未入庫（棚入れ待ち）を商品ごとに集計（②入庫の候補一覧）。
+ * opts.siteId 指定時は、その工場で受け入れた入荷分だけを候補にする（他工場の入荷を棚入れさせない）。
+ */
+export async function listPendingPutaway(
+  companyId: string,
+  opts: { siteId?: string | null } = {},
+): Promise<PendingPutaway[]> {
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
@@ -1584,10 +1683,13 @@ export async function listPendingPutaway(companyId: string): Promise<PendingPuta
       SUM(l.qty - l.qty_putaway) AS pending_qty,
       (SELECT r2.deliver_to FROM receipt_lines l2 JOIN receipts r2 ON r2.id = l2.receipt_id
          WHERE l2.company_id = ${companyId} AND l2.product_id = l.product_id AND l2.qty > l2.qty_putaway
+           AND (${opts.siteId ?? null}::uuid IS NULL OR r2.site_id = ${opts.siteId ?? null})
          ORDER BY l2.created_at DESC LIMIT 1) AS deliver_to
     FROM receipt_lines l
     JOIN products p ON p.id = l.product_id
+    JOIN receipts r ON r.id = l.receipt_id
     WHERE l.company_id = ${companyId} AND l.qty > l.qty_putaway
+      AND (${opts.siteId ?? null}::uuid IS NULL OR r.site_id = ${opts.siteId ?? null})
     GROUP BY l.product_id, p.drawing_no, p.product_code, p.stock_key, p.name, p.unit, p.lot_size, p.supplier
     HAVING SUM(l.qty - l.qty_putaway) > 0
     ORDER BY p.drawing_no ASC`;
@@ -1622,18 +1724,22 @@ export async function getPendingQtyForProduct(companyId: string, productId: stri
  */
 export async function putawayProduct(
   companyId: string,
-  input: { productId: string; locationId: string; qty: number; operator: string }
+  input: { productId: string; locationId: string; qty: number; operator: string; siteId?: string | null }
 ): Promise<{ qtyAfter: number }> {
   await ensureSchema();
   const sql = getSql();
   const q = Math.abs(input.qty);
   if (q === 0) throw new Error("数量が 0 です");
 
-  // 未入庫の受入明細を古い順（FIFO）に取得
+  // 未入庫の受入明細を古い順（FIFO）に取得。
+  // siteId 指定時は同じ工場で受け入れた入荷だけを消し込む（他工場の入荷を横取りしない）。
   const openLines = await sql`
-    SELECT id, receipt_id, qty, qty_putaway, ref_no, supplier FROM receipt_lines
-    WHERE company_id = ${companyId} AND product_id = ${input.productId} AND qty > qty_putaway
-    ORDER BY created_at ASC, seq ASC`;
+    SELECT rl.id, rl.receipt_id, rl.qty, rl.qty_putaway, rl.ref_no, rl.supplier
+    FROM receipt_lines rl
+    JOIN receipts r ON r.id = rl.receipt_id
+    WHERE rl.company_id = ${companyId} AND rl.product_id = ${input.productId} AND rl.qty > rl.qty_putaway
+      AND (${input.siteId ?? null}::uuid IS NULL OR r.site_id = ${input.siteId ?? null})
+    ORDER BY rl.created_at ASC, rl.seq ASC`;
   const pending = openLines.reduce((s: number, l: any) => s + (Number(l.qty) - Number(l.qty_putaway)), 0);
   if (pending < q) throw new Error(`未入庫数が不足しています（未入庫 ${pending}）`);
 
@@ -1698,13 +1804,17 @@ export interface Worker {
   createdAt: string;
 }
 
-/** 会社の作業者アカウント一覧（名前順）。 */
-export async function listWorkers(companyId: string): Promise<Worker[]> {
+/**
+ * 会社の作業者アカウント一覧（名前順）。
+ * factory 指定時はその工場の作業者＋工場未設定（＝全工場で選べる）作業者だけを返す。
+ */
+export async function listWorkers(companyId: string, factory: string | null = null): Promise<Worker[]> {
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
     SELECT id, name, created_at FROM users
     WHERE company_id = ${companyId} AND role = 'worker'
+      AND (${factory}::text IS NULL OR factory IS NULL OR factory = ${factory})
     ORDER BY name ASC`;
   return rows.map((r: any) => ({ id: r.id, name: r.name, createdAt: tsStr(r.created_at) }));
 }

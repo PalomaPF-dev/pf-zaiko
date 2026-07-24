@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Printer, Download, Save, CheckCircle2, Undo2, XCircle } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { getStocktake, listStocktakeLines } from "@/lib/db";
+import { currentScope } from "@/lib/scope";
 import {
   saveStocktakeCountsAction,
   reviewStocktakeAction,
@@ -24,9 +25,12 @@ export default async function StocktakeDetailPage({ params }: { params: Promise<
   const { companyId } = await requireEntitledSession();
   const { id } = await params;
 
+  // 他工場の棚卸は開けない（スコープ外なら null → 404）
+  const { siteId } = await currentScope();
+
   let take, lines;
   try {
-    take = await getStocktake(companyId, id);
+    take = await getStocktake(companyId, id, siteId);
     if (!take) notFound();
     lines = await listStocktakeLines(companyId, id);
   } catch (e) {

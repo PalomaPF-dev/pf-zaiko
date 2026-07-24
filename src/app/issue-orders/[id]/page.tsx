@@ -4,6 +4,7 @@ import { ArrowLeft, Printer, Plus, ScanLine, Trash2, XCircle } from "lucide-reac
 import { requireEntitledSession } from "@/lib/session";
 import { getIssueOrder, listIssueOrderLines, listProducts, listLocations } from "@/lib/db";
 import { resolveCurrentWorkplace } from "@/lib/workplace";
+import { currentScope } from "@/lib/scope";
 import {
   addIssueOrderLineAction,
   deleteIssueOrderLineAction,
@@ -26,9 +27,12 @@ export default async function IssueOrderDetailPage({ params }: { params: Promise
   const { companyId } = await requireEntitledSession();
   const { id } = await params;
 
+  // 他工場の出庫指示は開けない
+  const { siteId } = await currentScope();
+
   let order, lines, products, locations;
   try {
-    order = await getIssueOrder(companyId, id);
+    order = await getIssueOrder(companyId, id, siteId);
     if (!order) notFound();
     const wp = await resolveCurrentWorkplace(companyId);
     [lines, products, locations] = await Promise.all([

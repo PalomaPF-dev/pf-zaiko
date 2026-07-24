@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ClipboardCheck, Plus } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { listStocktakes } from "@/lib/db";
+import { currentScope } from "@/lib/scope";
 import { formatDateTime } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import { StocktakeStatusBadge } from "@/components/Badges";
@@ -12,9 +13,11 @@ export const dynamic = "force-dynamic";
 export default async function StocktakesPage() {
   const session = await requireEntitledSession();
 
+  const { siteId } = await currentScope();
+
   let takes;
   try {
-    takes = await listStocktakes(session.companyId);
+    takes = await listStocktakes(session.companyId, { siteId });
   } catch (e) {
     console.error("[stocktakes]", e);
     return (

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { getStocktake, listStocktakeLines } from "@/lib/db";
+import { currentScope } from "@/lib/scope";
 import { formatDateTime } from "@/lib/format";
 import PrintButton from "@/components/PrintButton";
 import DbErrorState from "@/components/DbErrorState";
@@ -23,9 +24,11 @@ export default async function StocktakePrintPage({ params }: { params: Promise<{
   const { companyId } = await requireEntitledSession();
   const { id } = await params;
 
+  const { siteId } = await currentScope();
+
   let take, lines;
   try {
-    take = await getStocktake(companyId, id);
+    take = await getStocktake(companyId, id, siteId);
     if (!take) notFound();
     lines = await listStocktakeLines(companyId, id);
   } catch (e) {

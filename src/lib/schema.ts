@@ -266,6 +266,10 @@ async function buildSchema(): Promise<void> {
       created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS stocktakes_company_status_idx ON stocktakes(company_id, status, created_at DESC)`);
+  // 実施した工場（作成時の「現在の職場」から記録）。工場スコープの絞り込みに使う。
+  // NULL＝工場不明（この機能より前に作られた棚卸）。工場所属ユーザーには見せない（安全側）。
+  await safeDdl(() => sql`ALTER TABLE stocktakes ADD COLUMN IF NOT EXISTS site_id UUID REFERENCES sites(id) ON DELETE SET NULL`);
+  await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS stocktakes_site_idx ON stocktakes(company_id, site_id)`);
 
   // --- 棚卸明細（商品×ロケ 1行） ---
   await safeDdl(() => sql`
@@ -301,6 +305,9 @@ async function buildSchema(): Promise<void> {
       UNIQUE (company_id, order_no)
     )`);
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS issue_orders_company_status_idx ON issue_orders(company_id, status, created_at DESC)`);
+  // 出庫元の工場（作成時の「現在の職場」から記録）。工場スコープの絞り込みに使う（NULL＝工場不明）。
+  await safeDdl(() => sql`ALTER TABLE issue_orders ADD COLUMN IF NOT EXISTS site_id UUID REFERENCES sites(id) ON DELETE SET NULL`);
+  await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS issue_orders_site_idx ON issue_orders(company_id, site_id)`);
 
   // --- 出庫指示 明細（商品×引当ロケ×数量） ---
   await safeDdl(() => sql`
@@ -339,6 +346,10 @@ async function buildSchema(): Promise<void> {
       UNIQUE (company_id, receipt_no)
     )`);
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS receipts_company_status_idx ON receipts(company_id, status, created_at DESC)`);
+  // 受け入れた工場（作成時の「現在の職場」から記録）。工場スコープの絞り込みに使う（NULL＝工場不明）。
+  // 未入庫（棚入れ待ち）の集計もこの列で絞るため、他工場の入荷が棚入れ候補に出てこない。
+  await safeDdl(() => sql`ALTER TABLE receipts ADD COLUMN IF NOT EXISTS site_id UUID REFERENCES sites(id) ON DELETE SET NULL`);
+  await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS receipts_site_idx ON receipts(company_id, site_id)`);
 
   // --- 受入明細（商品×受入数。ロケ未定＝未入庫。②入庫で qty_putaway を消し込む） ---
   await safeDdl(() => sql`

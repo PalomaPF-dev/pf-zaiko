@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Tag, ArrowDownToLine, Boxes } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { getLocationByCode, listStockForLocation } from "@/lib/db";
+import { currentScope } from "@/lib/scope";
 import { parseLocCode, describeLoc } from "@/lib/location";
 import PageHeader from "@/components/PageHeader";
 import DbErrorState from "@/components/DbErrorState";
@@ -14,9 +15,12 @@ export default async function LocationDetailPage({ params }: { params: Promise<{
   const { code } = await params;
   const decoded = decodeURIComponent(code);
 
+  // 他工場の置き場は照会できない
+  const { siteId } = await currentScope();
+
   let location, stock;
   try {
-    location = await getLocationByCode(companyId, decoded);
+    location = await getLocationByCode(companyId, decoded, siteId);
     if (!location) notFound();
     stock = await listStockForLocation(companyId, location.id);
   } catch (e) {

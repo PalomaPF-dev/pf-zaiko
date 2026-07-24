@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getOptionalSession } from "@/lib/session";
 import { listWorkers } from "@/lib/db";
+import { currentSiteScope } from "@/lib/scope";
 
 export const runtime = "nodejs";
 
@@ -15,7 +16,9 @@ export async function GET() {
   const user = await getOptionalSession();
   if (!user) return NextResponse.json({ message: "ログインが必要です。" }, { status: 401 });
   try {
-    const workers = await listWorkers(user.companyId);
+    // 工場スコープが効いているときは、自工場の作業者＋工場未設定の作業者だけを選択肢にする
+    const scope = await currentSiteScope();
+    const workers = await listWorkers(user.companyId, scope?.factory ?? null);
     return NextResponse.json({ workers });
   } catch (err) {
     console.error("[workers] list error:", err);

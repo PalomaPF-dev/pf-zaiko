@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "./authOptions";
 import { getCompanyEntitlement } from "./entitlement";
-import { getUserRole } from "./authDb";
+import { getUserRole, getUserRoleAndFactory, type UserRole } from "./authDb";
 
 export interface AppSession {
   companyId: string;
@@ -79,6 +79,54 @@ export async function requireAdminPage(): Promise<AppSession> {
     redirect("/");
   }
   return s;
+}
+
+/**
+ * 工場スコープ（データ表示制限）の判定。
+ * - 管理者（role='admin'）と工場未設定（factory=NULL）ユーザー → null（全工場を閲覧可）
+ * - それ以外（工場所属の一般・作業者） → 所属工場名（その工場＝sites 配下のデータのみ閲覧可）
+ */
+export function factoryScopeOf(role: UserRole | null, factory: string | null): string | null {
+  return role === "admin" ? null : factory;
+}
+
+/** AppSession に所属工場（DB由来）と工場スコープを足したもの。 */
+export interface ScopedSession extends AppSession {
+  /** ポータルから連携された所属工場名（未設定なら null） */
+  factory: string | null;
+  /** 非 null のとき、その工場のデータだけを閲覧できる（null＝制限なし） */
+  factoryScope: string | null;
+}
+
+/** セッション＋DBの役割・所属工場を1つにまとめる（role は DB を優先）。 */
+async function withFactory(s: AppSession): Promise<ScopedSession> {
+  const { role, factory } = await getUserRoleAndFactory(s.userId);
+  const effectiveRole = role ?? s.role;
+  return { ...s, role: effectiveRole, factory, factoryScope: factoryScopeOf(effectiveRole, factory) };
+}
+
+/**
+ * ログイン＋利用権＋工場スコープを要求するセッション。
+ * role/factory は DB から都度取得する（JWT には載せない＝ポータルでの変更が既存セッションにも即時反映される）。
+ * 表示を絞る Server Component / Server Action はこれ（か scope.ts の currentSiteScope）を使う。
+ */
+export async function requireScopedSession(): Promise<ScopedSession> {
+  return withFactory(await requireEntitledSession());
+}
+
+/** リダイレクトせず、未ログインなら null（API route / 内部のスコープ解決用）。 */
+export async function getScopedSession(): Promise<ScopedSession | null> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.companyId) return null;
+  return withFactory({
+    companyId: session.user.companyId,
+    companyName: session.user.companyName,
+    userId: session.user.id,
+    userName: session.user.name ?? "",
+    email: session.user.email ?? "",
+    role: session.user.role ?? "admin",
+    isDemo: Boolean(session.user.isDemo),
+  });
 }
 
 /** リダイレクトせず、未ログインなら null を返す（任意表示用）。 */

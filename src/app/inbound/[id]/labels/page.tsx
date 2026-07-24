@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { ArrowLeft } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { getReceipt, getReceiptLinesByIds, markReceiptLinesLabelPrinted } from "@/lib/db";
+import { currentScope } from "@/lib/scope";
 import { productLabelCode } from "@/lib/types";
 import { productQrPayload, buildQrDataUrls } from "@/lib/qr";
 import { formatDate } from "@/lib/format";
@@ -25,9 +26,11 @@ export default async function ReceiptLabelsPage({
   const sp = await searchParams;
   const ids = (sp.ids ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
+  const { siteId } = await currentScope();
+
   let receipt, lines;
   try {
-    receipt = await getReceipt(session.companyId, id);
+    receipt = await getReceipt(session.companyId, id, siteId);
     if (!receipt) notFound();
     lines = await getReceiptLinesByIds(session.companyId, ids);
     if (lines.length > 0) await markReceiptLinesLabelPrinted(session.companyId, lines.map((l) => l.id));

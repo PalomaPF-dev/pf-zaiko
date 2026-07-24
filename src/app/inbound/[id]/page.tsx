@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Printer, Plus, ArrowRightLeft } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { getReceipt, listReceiptLines, listProducts } from "@/lib/db";
+import { currentScope } from "@/lib/scope";
 import { addReceiptLineAction } from "@/lib/actions";
 import { formatDate } from "@/lib/format";
 import { RECEIPT_STATUS_LABEL } from "@/lib/types";
@@ -17,9 +18,12 @@ export default async function ReceiptDetailPage({ params }: { params: Promise<{ 
   const { companyId } = await requireEntitledSession();
   const { id } = await params;
 
+  // 他工場の受入伝票は開けない
+  const { siteId } = await currentScope();
+
   let receipt, lines, products;
   try {
-    receipt = await getReceipt(companyId, id);
+    receipt = await getReceipt(companyId, id, siteId);
     if (!receipt) notFound();
     [lines, products] = await Promise.all([listReceiptLines(companyId, id), listProducts(companyId, { activeOnly: true })]);
   } catch (e) {

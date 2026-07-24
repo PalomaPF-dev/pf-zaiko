@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { listTransactions } from "@/lib/db";
+import { currentScope } from "@/lib/scope";
 import { toCsv } from "@/lib/csv";
 import { formatDateTime, todayJST } from "@/lib/format";
 import { TX_TYPE_LABEL, IO_TX_TYPES, type TxType } from "@/lib/types";
@@ -21,8 +22,11 @@ export async function GET(req: Request) {
   const typeRaw = url.searchParams.get("type");
   const txType = (ALL_TX_TYPES as string[]).includes(typeRaw ?? "") ? (typeRaw as TxType) : null;
 
+  // 工場スコープ: クエリの職場が自工場外なら siteId 条件で必ず 0 件になる
+  const { siteId } = await currentScope();
   const txs = await listTransactions(session.user.companyId, {
     workplaceId: url.searchParams.get("workplace") || null,
+    siteId,
     productId: url.searchParams.get("product") || null,
     txType,
     dateFrom: url.searchParams.get("from") || null,

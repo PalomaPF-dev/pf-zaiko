@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import { ArrowLeft } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { getIssueOrder, listIssueOrderLines } from "@/lib/db";
+import { currentScope } from "@/lib/scope";
 import { productLabelCode } from "@/lib/types";
 import { buildQrDataUrls } from "@/lib/qr";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -35,9 +36,11 @@ export default async function PickingListPage({ params }: { params: Promise<{ id
   const session = await requireEntitledSession();
   const { id } = await params;
 
+  const { siteId } = await currentScope();
+
   let order, lines;
   try {
-    order = await getIssueOrder(session.companyId, id);
+    order = await getIssueOrder(session.companyId, id, siteId);
     if (!order) notFound();
     lines = await listIssueOrderLines(session.companyId, id);
   } catch (e) {
