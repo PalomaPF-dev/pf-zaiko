@@ -14,6 +14,7 @@ import {
   ClipboardList,
   ClipboardCheck,
   LogOut,
+  Mail,
   Settings,
   BookOpen,
 } from "lucide-react";
@@ -112,6 +113,16 @@ function UserFooter() {
         </span>
       </div>
       <FactoryScopeNote />
+      {/* ポータルのお問い合わせフォーム（このアプリを選択した状態で開く） */}
+      <a
+        href="https://portal.paloma-pf.com/?contact=zaiko"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+      >
+        <Mail className="h-4 w-4" />
+        お問い合わせ
+      </a>
       <button
         onClick={() => {
           void signOut({ redirect: false }).then(() => {
