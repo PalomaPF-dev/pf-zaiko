@@ -83,7 +83,7 @@ function FactoryScopeNote() {
 
   if (!scope) return null;
   return (
-    <div className="mb-2 text-[10px] leading-snug text-slate-400">
+    <div className="mb-2 text-[10px] leading-snug text-[#909090]">
       {scope.matched
         ? `${scope.factory}のデータのみ表示`
         : `${scope.factory}は工場マスタに未登録のため表示できるデータがありません`}
@@ -95,22 +95,12 @@ function FactoryScopeNote() {
 function UserFooter() {
   const { data: session } = useSession();
   if (!session?.user) return null;
-  const role = session.user.role;
-  const isAdmin = role === "admin";
   return (
-    <div className="mt-auto border-t border-slate-100 px-4 py-3">
-      <div className="mb-2 truncate text-xs text-slate-500">
+    <div className="mt-auto border-t border-[#e5e5e5] px-4 py-3">
+      <div className="mb-2 truncate text-xs text-[#707070]">
         {session.user.companyName}
         <span className="mx-1 text-slate-300">/</span>
         {session.user.name}
-        <span
-          style={isAdmin ? { color: ACCENT, backgroundColor: `${ACCENT}0D` } : undefined}
-          className={`ml-1.5 rounded px-1 py-0.5 text-[10px] font-semibold ${
-            isAdmin ? "" : "bg-slate-100 text-slate-500"
-          }`}
-        >
-          {isAdmin ? "管理者" : role === "worker" ? "作業者" : "一般"}
-        </span>
       </div>
       <FactoryScopeNote />
       {/* ポータルのお問い合わせフォーム（このアプリを選択した状態で開く） */}
@@ -118,7 +108,7 @@ function UserFooter() {
         href="https://portal.paloma-pf.com/?contact=zaiko"
         target="_blank"
         rel="noopener noreferrer"
-        className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+        className="mb-2 flex w-full items-center justify-center gap-2 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-medium text-[#555555] hover:bg-[#f7f7f5]"
       >
         <Mail className="h-4 w-4" />
         お問い合わせ
@@ -129,7 +119,7 @@ function UserFooter() {
             window.location.href = "https://portal.paloma-pf.com/";
           });
         }}
-        className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+        className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#e5e5e5] px-3 py-2 text-xs font-medium text-[#555555] hover:bg-[#f7f7f5]"
       >
         <LogOut className="h-4 w-4" />
         ログアウト
