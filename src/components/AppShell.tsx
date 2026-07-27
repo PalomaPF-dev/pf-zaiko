@@ -95,22 +95,12 @@ function FactoryScopeNote() {
 function UserFooter() {
   const { data: session } = useSession();
   if (!session?.user) return null;
-  const role = session.user.role;
-  const isAdmin = role === "admin";
   return (
     <div className="mt-auto border-t border-[#e5e5e5] px-4 py-3">
       <div className="mb-2 truncate text-xs text-[#707070]">
         {session.user.companyName}
         <span className="mx-1 text-slate-300">/</span>
         {session.user.name}
-        <span
-          style={isAdmin ? { color: ACCENT, backgroundColor: `${ACCENT}0D` } : undefined}
-          className={`ml-1.5 rounded px-1 py-0.5 text-[10px] font-semibold ${
-            isAdmin ? "" : "bg-[#f7f7f5] text-[#707070]"
-          }`}
-        >
-          {isAdmin ? "管理者" : role === "worker" ? "作業者" : "一般"}
-        </span>
       </div>
       <FactoryScopeNote />
       {/* ポータルのお問い合わせフォーム（このアプリを選択した状態で開く） */}
