@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CameraOff, RefreshCw } from "lucide-react";
+import { CameraOff, RefreshCw, ScanLine } from "lucide-react";
+import { useScanWedge } from "@paloma-pf/ui";
 import { resolveScan } from "@/lib/qr";
 
 const REGION_ID = "qr-reader-region";
@@ -22,6 +23,42 @@ export default function InventoryQrScanner({
   const [scanKey, setScanKey] = useState(0);
   const onResultRef = useRef(onResult);
   onResultRef.current = onResult;
+  // カメラ実体。ハンディで読んだときにもカメラを止められるよう ref で持つ
+  const instanceRef = useRef<{ stop: () => Promise<void>; clear: () => void } | null>(null);
+
+  /** カメラ・ハンディの区別なく、読み取れたコードを解決して遷移／コールバックする。 */
+  const handleDecoded = useCallback(
+    (text: string) => {
+      const r = resolveScan(text);
+      const inst = instanceRef.current;
+      instanceRef.current = null;
+      Promise.resolve()
+        .then(() => inst?.stop())
+        .catch(() => {
+          /* 停止済みなどは無視 */
+        })
+        .then(() => {
+          try {
+            inst?.clear();
+          } catch {
+            /* noop */
+          }
+          if (onResultRef.current) {
+            onResultRef.current(r);
+          } else {
+            const target =
+              r.kind === "location"
+                ? `/locations/${encodeURIComponent(r.code)}`
+                : `/products/${encodeURIComponent(r.code)}`;
+            router.push(target);
+          }
+        });
+    },
+    [router]
+  );
+
+  // ハンディターミナル（DataWedge のキーストローク出力）で読み取った場合もここに入る
+  useScanWedge({ onScan: handleDecoded });
 
   useEffect(() => {
     let active = true;
@@ -38,6 +75,7 @@ export default function InventoryQrScanner({
           clear: () => void;
         };
         instance = inst;
+        instanceRef.current = inst;
         setStatus("scanning");
         await inst.start(
           { facingMode: "environment" },
@@ -56,35 +94,19 @@ export default function InventoryQrScanner({
       }
     })();
 
-    async function stop() {
-      try {
-        await instance?.stop();
-        instance?.clear();
-      } catch {
-        /* noop */
-      }
-    }
-
-    function handleDecoded(text: string) {
-      const r = resolveScan(text);
-      stop().then(() => {
-        if (onResultRef.current) {
-          onResultRef.current(r);
-        } else {
-          const target =
-            r.kind === "location"
-              ? `/locations/${encodeURIComponent(r.code)}`
-              : `/products/${encodeURIComponent(r.code)}`;
-          router.push(target);
-        }
-      });
-    }
-
     return () => {
       active = false;
-      stop();
+      instanceRef.current = null;
+      (async () => {
+        try {
+          await instance?.stop();
+          instance?.clear();
+        } catch {
+          /* noop */
+        }
+      })();
     };
-  }, [router, scanKey]);
+  }, [handleDecoded, scanKey]);
 
   return (
     <div>
@@ -105,6 +127,12 @@ export default function InventoryQrScanner({
       {status === "scanning" && (
         <p className="mt-3 text-center text-sm text-slate-500">カメラにQRコードをかざしてください…</p>
       )}
+
+      {/* ハンディターミナルはカメラを使わず、トリガーを引くだけで読み取れる */}
+      <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs text-slate-400">
+        <ScanLine className="h-3.5 w-3.5" />
+        ハンディターミナルはトリガーを引いて読み取れます
+      </p>
 
       {status === "error" && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
