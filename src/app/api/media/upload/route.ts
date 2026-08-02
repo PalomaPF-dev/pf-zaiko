@@ -2,11 +2,17 @@ import { NextResponse } from "next/server";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
+import { BLOB_APP_PREFIX } from "@/lib/blobPrefix";
 
 export const runtime = "nodejs";
 
-/** アップロード先プレフィックスのホワイトリスト */
-const ALLOWED_PREFIXES = ["item-media/", "record-media/", "drawings/", "workplace-map/"];
+/** アップロード先プレフィックスのホワイトリスト（社内共通Store上の自アプリ区画のみ許可） */
+const ALLOWED_PREFIXES = [
+  `${BLOB_APP_PREFIX}/item-media/`,
+  `${BLOB_APP_PREFIX}/record-media/`,
+  `${BLOB_APP_PREFIX}/drawings/`,
+  `${BLOB_APP_PREFIX}/workplace-map/`,
+];
 
 /**
  * クライアント直接アップロード（@vercel/blob/client）用のトークン発行。

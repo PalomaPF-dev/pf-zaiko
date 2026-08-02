@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { compressImageFile } from "@/lib/imageCompress";
 import { setWorkplaceMapImageAction, setAreaPinAction, deleteAreaPinAction } from "@/lib/actions";
+import { BLOB_APP_PREFIX } from "@/lib/blobPrefix";
 import type { AreaPin } from "@/lib/types";
 
 interface AreaInfo {
@@ -63,7 +64,7 @@ export default function AreaMap({
     try {
       const compressed = await compressImageFile(file, 2400, 0.85);
       const { upload } = await import("@vercel/blob/client");
-      const res = await upload(`workplace-map/${workplaceId}/${Date.now()}.jpg`, compressed, {
+      const res = await upload(`${BLOB_APP_PREFIX}/workplace-map/${workplaceId}/${Date.now()}.jpg`, compressed, {
         access: "public",
         handleUploadUrl: "/api/media/upload",
         multipart: compressed.size > 8 * 1024 * 1024,
