@@ -8,13 +8,13 @@ const inputCls =
 
 /**
  * 記録フォーム用の作業者セレクト（name="operator" で FormData に載る）。
- * - 作業者（role='worker'）でログイン中：本人名で固定表示（選択不可。サーバー側でも本人名を強制）。
+ * - 非管理者（一般。旧作業者を含む）でログイン中：本人名で固定表示（選択不可。サーバー側でも本人名を強制）。
  * - 管理者・一般：/api/workers の作業者アカウント一覧から代理入力できる。
  *   一覧が空のときは何も表示せず、従来どおりログイン中のアカウント名で記録される（サーバー側フォールバック）。
  */
 export default function OperatorSelect() {
   const { data: session, status } = useSession();
-  const isWorker = session?.user?.role === "worker";
+  const isWorker = session?.user?.role != null && session.user.role !== "admin";
   const [workers, setWorkers] = useState<string[]>([]);
 
   useEffect(() => {

@@ -1813,7 +1813,7 @@ export async function listWorkers(companyId: string, factory: string | null = nu
   const sql = getSql();
   const rows = await sql`
     SELECT id, name, created_at FROM users
-    WHERE company_id = ${companyId} AND role = 'worker'
+    WHERE company_id = ${companyId} AND role <> 'admin'
       AND (${factory}::text IS NULL OR factory IS NULL OR factory = ${factory})
     ORDER BY name ASC`;
   return rows.map((r: any) => ({ id: r.id, name: r.name, createdAt: tsStr(r.created_at) }));
