@@ -86,7 +86,7 @@ function intOr(fd: FormData, key: string, fallback: number): number {
 
 /**
  * 記録に載せる担当者名を決める。
- * 作業者（role='worker'）は送信値を無視して必ず本人（ログイン中のアカウント名）で記録する。
+ * 非管理者（一般。旧作業者を含む）は送信値を無視して必ず本人（ログイン中のアカウント名）で記録する。
  * 管理者・一般は作業者アカウント一覧からの代理入力を優先（未選択はログイン中のアカウント名）。
  */
 function resolveOperator(
@@ -94,7 +94,7 @@ function resolveOperator(
   role: "admin" | "member" | "worker",
   userName: string
 ): string {
-  if (role === "worker") return userName || "（未設定）";
+  if (role !== "admin") return userName || "（未設定）";
   return str(fd, "operator") || userName || "（未設定）";
 }
 
