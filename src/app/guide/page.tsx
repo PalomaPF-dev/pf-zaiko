@@ -13,6 +13,7 @@ import {
   ClipboardCheck,
   Bell,
   BookOpen,
+  BookMarked,
   Info,
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
@@ -66,9 +67,18 @@ export default function GuidePage() {
 
         <GuideStep no={4} icon={Package} title="副資材を登録する" href="/products/new" linkLabel="副資材を登録">
           <b>品名</b>と<b>メーカー品番</b>（QR・検索の主キー）を登録します。単位・<b>安全在庫（下限）</b>・規格・メーカーも設定でき、安全在庫を下回るとアラート対象になります。
+          <br />
+          <b>資材W/F に登録済みの品目</b>なら、フォーム冒頭の「<b>品目コードから呼び出す</b>」に品目コード（例{" "}
+          <span className="font-mono">06-26105-00</span>）を入れると、品名・購入先・ロットサイズが自動で入ります。
         </GuideStep>
 
-        <GuideStep no={5} icon={Contact} title="取引先を登録する（任意）" href="/partners" linkLabel="取引先">
+        <GuideStep no={5} icon={BookMarked} title="品目マスタから探す（資材W/F）" href="/items" linkLabel="品目マスタ">
+          資材W/F の品目マスタを取り込んであります。<b>品目コード・品名・仕入先</b>で検索し、
+          「<b>この品目で商品を登録</b>」を押すとそのまま副資材として登録できます。品目コードは<b>図番</b>として登録され、
+          以降は<b>スキャン・手入力でその品目コードから呼び出せます</b>。
+        </GuideStep>
+
+        <GuideStep no={6} icon={Contact} title="取引先を登録する（任意）" href="/partners" linkLabel="取引先">
           <b>仕入先</b>（入荷で選択）・<b>出荷先</b>（出庫指示で選択）・<b>移動先</b>（社内）を登録しておくと、各画面で選べます。
         </GuideStep>
       </div>

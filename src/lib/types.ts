@@ -94,6 +94,48 @@ export interface ProductWithStock extends Product {
   belowSafety: boolean; // 安全在庫割れか
 }
 
+/**
+ * 品目マスタの1件（資材W/F から取り込んだ参照カタログ）。
+ * 在庫は持たない。品目コードで呼び出して商品（Product）を起こすための元データ。
+ * 数量系は W/F の値をそのまま持つため小数がありうる（在庫数の integer とは別物）。
+ */
+export interface ItemMaster {
+  code: string; // 品目コード（図番9桁）
+  name: string; // 部品名
+  supplierCode: string | null; // 外注コード（代表）
+  supplierName: string | null; // 外注名（代表）
+  altSuppliers: string | null; // 併用仕入先（代表以外。／区切り）
+  unitCode: string | null; // 単位（W/Fの単位コード）
+  packQty: number | null; // 入数
+  packUnitCode: string | null; // 入数単位（W/Fの単位コード）
+  lotQty: number | null; // ロット数
+  roundQty: number | null; // まるめ（発注単位）
+  container: string | null; // 容器
+  accountCode: string | null; // 受入科目
+  unitPrice: number | null; // 納入単価
+  validFrom: string | null; // 有効開始日（YYYYMMDD）
+  validTo: string | null; // 有効終了日（YYYYMMDD）
+  active: boolean; // 取込時点で有効な品目か
+}
+
+/** 品目マスタ＋在庫アプリ側の登録状況（一覧・呼び出し用） */
+export interface ItemMasterWithProduct extends ItemMaster {
+  productId: string | null; // 商品として登録済みならその ID（未登録なら null）
+}
+
+/** 品目コード呼び出し（/api/items/lookup）のレスポンス。単位コードは表示名に解決済み。 */
+export interface ItemMasterLookup extends ItemMasterWithProduct {
+  unitLabel: string;
+  packUnitLabel: string;
+}
+
+/** 品目マスタの取込状況（会社ごと） */
+export interface ItemMasterImport {
+  version: string; // 取込元スナップショットの基準日（YYYYMMDD）
+  itemCount: number;
+  importedAt: string;
+}
+
 /** ロケーション階層（採番マスタ） */
 export interface LocArea {
   id: string;

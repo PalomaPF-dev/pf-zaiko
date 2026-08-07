@@ -63,6 +63,7 @@ import {
   type ProductInput,
   type PartnerInput,
 } from "./db";
+import { reimportItemMaster } from "./itemMasterSeed";
 import { IO_TX_TYPES, PARTNER_KIND_LABEL, type TxType, type PartnerKind } from "./types";
 
 // ===== FormData ヘルパー =====
@@ -192,6 +193,15 @@ export async function deleteProductAction(id: string): Promise<void> {
   await deleteProduct(companyId, id);
   revalidatePath("/products");
   redirect("/products");
+}
+
+// ===== 品目マスタ（資材W/F） =====
+
+/** 同梱の品目マスタを取り込み直す（版が同じでも上書き）。管理者のみ。 */
+export async function reimportItemMasterAction(): Promise<void> {
+  const { companyId } = await requireAdminSession();
+  await reimportItemMaster(companyId);
+  revalidatePath("/items");
 }
 
 // ===== ロケーション =====

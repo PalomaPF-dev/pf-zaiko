@@ -25,6 +25,7 @@ let schemaReady: Promise<void> | null = null;
 /**
  * 在庫管理のドメインテーブルを冪等に作成。
  * - products         … 商品（図番＝会社内一意。QRラベルの親）
+ * - item_master      … 品目マスタ（資材W/F から取り込む参照カタログ。品目コードで商品を呼び出す）
  * - loc_areas        … ロケーション階層マスタ（エリア）
  * - loc_counters     … ロケ採番カウンタ（エリア×棚×段の間口採番）
  * - locations        … 実在ロケーション（エリア-棚-段-間口）
@@ -103,6 +104,45 @@ async function buildSchema(): Promise<void> {
   await safeDdl(() => sql`
     CREATE UNIQUE INDEX IF NOT EXISTS products_company_stockkey_unique
     ON products(company_id, stock_key) WHERE stock_key IS NOT NULL`);
+
+  // --- 品目マスタ（資材W/F から取り込む参照用カタログ） ---
+  // 商品（products）とは別物。W/F に登録済みの品目を「品目コードで呼び出す」ための引き当て表で、
+  // 在庫は持たない。ここから商品を起こすと products に1件作られ、以降の入出庫はそちらで動く。
+  await safeDdl(() => sql`
+    CREATE TABLE IF NOT EXISTS item_master (
+      id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      company_id     UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      code           TEXT NOT NULL,
+      name           TEXT NOT NULL,
+      supplier_code  TEXT,
+      supplier_name  TEXT,
+      alt_suppliers  TEXT,
+      unit_code      TEXT,
+      pack_qty       NUMERIC,
+      pack_unit_code TEXT,
+      lot_qty        NUMERIC,
+      round_qty      NUMERIC,
+      container      TEXT,
+      account_code   TEXT,
+      unit_price     NUMERIC,
+      valid_from     TEXT,
+      valid_to       TEXT,
+      active         BOOLEAN NOT NULL DEFAULT true,
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (company_id, code)
+    )`);
+  await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS item_master_company_name_idx ON item_master(company_id, name)`);
+  await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS item_master_company_supplier_idx ON item_master(company_id, supplier_name)`);
+
+  // 品目マスタの取込履歴（会社ごとに1行）。version = 取込元スナップショットの基準日。
+  // 同梱データの版と一致していれば取込済みとみなし、再取込をスキップする。
+  await safeDdl(() => sql`
+    CREATE TABLE IF NOT EXISTS item_master_imports (
+      company_id  UUID PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+      version     TEXT NOT NULL,
+      item_count  INTEGER NOT NULL DEFAULT 0,
+      imported_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
 
   // ===== 拠点（工場 sites / 職場 workplaces）: 副資材は職場ごとに在庫を独立管理 =====
   // 工場（サイト）

@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Package, Factory, MapPin, Contact, SlidersHorizontal } from "lucide-react";
+import { Package, BookMarked, Factory, MapPin, Contact, SlidersHorizontal } from "lucide-react";
 
 const TABS = [
   { href: "/products", label: "商品マスタ", icon: Package },
+  { href: "/items", label: "品目マスタ", icon: BookMarked },
   { href: "/sites", label: "工場・職場", icon: Factory },
   { href: "/locations", label: "ロケーション", icon: MapPin },
   { href: "/partners", label: "取引先", icon: Contact },

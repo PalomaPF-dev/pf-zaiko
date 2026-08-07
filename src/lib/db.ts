@@ -30,6 +30,9 @@ import type {
   ReceiptLineWithMeta,
   ReceiptStatus,
   PendingPutaway,
+  ItemMaster,
+  ItemMasterWithProduct,
+  ItemMasterImport,
 } from "./types";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -473,6 +476,104 @@ export async function listCategories(companyId: string): Promise<string[]> {
     WHERE company_id = ${companyId} AND category IS NOT NULL AND category <> ''
     ORDER BY category`;
   return rows.map((r: any) => r.category as string);
+}
+
+// ===== 品目マスタ（資材W/F 由来の参照カタログ） =====
+
+function mapItemMaster(r: any): ItemMaster {
+  return {
+    code: r.code,
+    name: r.name,
+    supplierCode: r.supplier_code,
+    supplierName: r.supplier_name,
+    altSuppliers: r.alt_suppliers,
+    unitCode: r.unit_code,
+    packQty: numOrNull(r.pack_qty),
+    packUnitCode: r.pack_unit_code,
+    lotQty: numOrNull(r.lot_qty),
+    roundQty: numOrNull(r.round_qty),
+    container: r.container,
+    accountCode: r.account_code,
+    unitPrice: numOrNull(r.unit_price),
+    validFrom: r.valid_from,
+    validTo: r.valid_to,
+    active: Boolean(r.active),
+  };
+}
+
+function mapItemMasterWithProduct(r: any): ItemMasterWithProduct {
+  return { ...mapItemMaster(r), productId: r.product_id ?? null };
+}
+
+export interface ItemMasterFilter {
+  search?: string | null;
+  activeOnly?: boolean;
+  /** 商品として未登録の品目だけに絞る */
+  unregisteredOnly?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * 品目マスタ一覧（品目コード／品名／仕入先で検索）。商品登録済みかも合わせて返す。
+ * ページ送り用の総件数はウィンドウ関数で同時に取る（同じ条件式を2回書かないため）。
+ */
+export async function listItemMaster(
+  companyId: string,
+  filter: ItemMasterFilter = {}
+): Promise<{ items: ItemMasterWithProduct[]; total: number }> {
+  await ensureSchema();
+  const sql = getSql();
+  // 「06-26105-00」のようなハイフン付きで検索されても拾えるよう、数字だけを抜いた形でもコードを見る
+  const raw = filter.search?.trim() || null;
+  const digits = raw ? raw.replace(/[^0-9]/g, "") : "";
+  const like = raw ? `%${raw}%` : null;
+  const codeLike = digits ? `%${digits}%` : null;
+  const limit = filter.limit ?? 100;
+  const rows = await sql`
+    SELECT i.*, p.id AS product_id, (COUNT(*) OVER ())::int AS total_count
+    FROM item_master i
+    LEFT JOIN products p ON p.company_id = i.company_id AND p.drawing_no = i.code
+    WHERE i.company_id = ${companyId}
+      AND (${filter.activeOnly ? true : null}::boolean IS NULL OR i.active = true)
+      AND (${filter.unregisteredOnly ? true : null}::boolean IS NULL OR p.id IS NULL)
+      AND (${like}::text IS NULL
+           OR i.name ILIKE ${like} OR i.supplier_name ILIKE ${like} OR i.alt_suppliers ILIKE ${like}
+           OR (${codeLike}::text IS NOT NULL AND i.code LIKE ${codeLike}))
+    ORDER BY i.code
+    LIMIT ${limit} OFFSET ${filter.offset ?? 0}`;
+  return {
+    items: rows.map(mapItemMasterWithProduct),
+    total: rows[0] ? Number(rows[0].total_count) : 0,
+  };
+}
+
+/** 品目コード（9桁）で1件引く。商品として登録済みならその ID も返す。 */
+export async function getItemMasterByCode(
+  companyId: string,
+  code: string
+): Promise<ItemMasterWithProduct | null> {
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT i.*, p.id AS product_id
+    FROM item_master i
+    LEFT JOIN products p ON p.company_id = i.company_id AND p.drawing_no = i.code
+    WHERE i.company_id = ${companyId} AND i.code = ${code}
+    LIMIT 1`;
+  return rows[0] ? mapItemMasterWithProduct(rows[0]) : null;
+}
+
+/** 品目マスタの取込状況（未取込なら null）。 */
+export async function getItemMasterImport(companyId: string): Promise<ItemMasterImport | null> {
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT version, item_count, imported_at FROM item_master_imports WHERE company_id = ${companyId} LIMIT 1`;
+  const r = rows[0];
+  return r
+    ? { version: r.version, itemCount: Number(r.item_count), importedAt: tsStr(r.imported_at) }
+    : null;
 }
 
 // ===== ロケーション =====

@@ -2,9 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Search } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
-import { getProductByAnyCode, getLocationByCode } from "@/lib/db";
+import { getProductByAnyCode, getLocationByCode, getItemMasterByCode } from "@/lib/db";
 import { currentScope } from "@/lib/scope";
 import { isLocCode } from "@/lib/location";
+import { formatItemCode, normalizeItemCode } from "@/lib/itemCode";
 import PageHeader from "@/components/PageHeader";
 import InventoryQrScanner from "@/components/InventoryQrScanner";
 
@@ -33,9 +34,20 @@ export default async function ScanPage({
 }: {
   searchParams: Promise<{ notfound?: string }>;
 }) {
-  await requireEntitledSession();
+  const { companyId, role } = await requireEntitledSession();
   const { notfound } = await searchParams;
   const notFoundCode = (notfound ?? "").trim().slice(0, 100);
+
+  // 商品として未登録でも、資材W/F の品目マスタに在れば「どの品目か」までは案内できる
+  let unregisteredItem = null;
+  const itemCode = notFoundCode ? normalizeItemCode(notFoundCode) : null;
+  if (itemCode) {
+    try {
+      unregisteredItem = await getItemMasterByCode(companyId, itemCode);
+    } catch (e) {
+      console.error("[scan] 品目マスタの照会に失敗:", e);
+    }
+  }
   return (
     <div className="mx-auto max-w-md p-4 sm:p-6">
       <PageHeader title="スキャン" description="QRを読むと、商品なら在庫画面、ロケなら在庫照会が開きます。" />
@@ -51,6 +63,22 @@ export default async function ScanPage({
         {notFoundCode && (
           <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
             「{notFoundCode}」に一致する商品・ロケが見つかりません。入力内容をご確認ください。
+            {unregisteredItem && (
+              <p className="mt-2 border-t border-amber-200 pt-2">
+                資材W/F の品目マスタには
+                <b className="mx-1">
+                  {formatItemCode(unregisteredItem.code)} {unregisteredItem.name}
+                </b>
+                があります（商品マスタは未登録）。
+                {role === "admin" ? (
+                  <Link href={`/items/${unregisteredItem.code}`} className="ml-1 font-semibold underline">
+                    商品として登録する →
+                  </Link>
+                ) : (
+                  <span className="ml-1">管理者に商品マスタへの登録をご依頼ください。</span>
+                )}
+              </p>
+            )}
           </div>
         )}
         <form action={lookupAction} className="flex items-center gap-2">
