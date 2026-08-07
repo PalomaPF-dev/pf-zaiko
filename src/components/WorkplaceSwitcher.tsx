@@ -15,6 +15,7 @@ export default function WorkplaceSwitcher({ compact = false }: { compact?: boole
   const router = useRouter();
   const [wps, setWps] = useState<WorkplaceWithSite[]>([]);
   const [current, setCurrent] = useState<string>("");
+  const [scoped, setScoped] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -26,6 +27,8 @@ export default function WorkplaceSwitcher({ compact = false }: { compact?: boole
         if (!alive) return;
         setWps(d.workplaces ?? []);
         setCurrent(d.currentId ?? "");
+        // 工場スコープの有無（null＝管理者・工場未設定＝全工場から選べる）
+        setScoped(Boolean(d.scope));
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
@@ -47,11 +50,19 @@ export default function WorkplaceSwitcher({ compact = false }: { compact?: boole
   }
 
   return (
+    <>
+    {/* サイドバーでは見出しを出す。工場スコープが無い人（管理者・工場未設定）は
+        全工場から選べるため、所属工場の指定と誤解されないよう明記する。 */}
+    {!compact && (
+      <div className="mb-1 px-0.5 text-[10px] leading-snug text-[#909090]">
+        作業する職場{scoped ? "（所属工場内）" : "（全工場から選べます）"}
+      </div>
+    )}
     <div
       className={`flex items-center gap-1.5 rounded-lg border border-fuchsia-200 bg-fuchsia-50/60 px-2 py-1.5 ${
         compact ? "" : "w-full"
       }`}
-      title="現在の職場（在庫・消費・入庫の対象）"
+      title={scoped ? "現在の職場（在庫・消費・入庫の対象）" : "現在の職場（在庫・消費・入庫の対象）。全工場から選べます"}
     >
       <Factory className="h-4 w-4 shrink-0 text-fuchsia-600" />
       <div className="relative flex-1">
@@ -70,5 +81,6 @@ export default function WorkplaceSwitcher({ compact = false }: { compact?: boole
         <ChevronDown className="pointer-events-none absolute right-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fuchsia-500" />
       </div>
     </div>
+    </>
   );
 }
