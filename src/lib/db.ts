@@ -478,6 +478,45 @@ export async function deleteProduct(companyId: string, id: string): Promise<void
 }
 
 /**
+ * カタログの未登録品目（削除済みを除く）を、**全件まとめて**品目マスタへ登録する。
+ * 「W/F上の不要品目をカタログから削除し終えたら、残りを一括で品目マスタ化する」運用向け。
+ * 1つの INSERT ... SELECT で完結する（ZK連番の通し採番・登録済みスキップは選択式と同じ）。
+ * 単位は unitLabels（W/F単位コード→単位名）で解決できたものだけ引き継ぎ、不明は「個」。
+ * @returns 登録した件数
+ */
+export async function bulkCreateProductsFromAllItems(
+  companyId: string,
+  unitLabels: Record<string, string>
+): Promise<number> {
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    WITH base AS (
+      SELECT COALESCE(MAX(NULLIF(regexp_replace(stock_key, '[^0-9]', '', 'g'), '')::bigint), 0) AS n
+      FROM products WHERE company_id = ${companyId} AND stock_key LIKE 'ZK%'
+    ), src AS (
+      SELECT i.code, i.name, i.supplier_name, i.lot_qty, i.unit_code,
+             row_number() OVER (ORDER BY i.code) AS rn
+      FROM item_master i
+      WHERE i.company_id = ${companyId} AND NOT i.hidden
+        AND NOT EXISTS (
+          SELECT 1 FROM products p WHERE p.company_id = ${companyId} AND p.drawing_no = i.code)
+    )
+    INSERT INTO products (company_id, drawing_no, name, unit, lot_size, supplier, stock_key, active)
+    SELECT ${companyId}, src.code, src.name,
+           COALESCE(${JSON.stringify(unitLabels)}::jsonb ->> src.unit_code, '個'),
+           CASE WHEN src.lot_qty = trunc(src.lot_qty) AND src.lot_qty BETWEEN 1 AND 2147483647
+                THEN src.lot_qty::int END,
+           src.supplier_name,
+           'ZK' || lpad((base.n + src.rn)::text, 8, '0'),
+           true
+    FROM src CROSS JOIN base
+    ON CONFLICT DO NOTHING
+    RETURNING id`;
+  return rows.length;
+}
+
+/**
  * 選択した品目の分類をまとめて設定する（category=null で未分類に戻す）。
  * カタログから一括登録した品目には分類が付いていないため、後からまとめて分類分けする用。
  * @returns 更新した件数

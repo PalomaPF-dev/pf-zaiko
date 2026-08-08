@@ -66,6 +66,7 @@ import {
   addReceiptLine,
   deleteReceiptLine,
   putawayProduct,
+  bulkCreateProductsFromAllItems,
   bulkCreateProductsFromItems,
   bulkDeleteProducts,
   bulkSetProductCategory,
@@ -75,7 +76,7 @@ import {
   type PartnerInput,
 } from "./db";
 import { reimportItemMaster } from "./itemMasterSeed";
-import { itemUnitForProduct, normalizeItemCode } from "./itemCode";
+import { ITEM_UNIT_LABELS, itemUnitForProduct, normalizeItemCode } from "./itemCode";
 import { IO_TX_TYPES, PARTNER_KIND_LABEL, type TxType, type PartnerKind } from "./types";
 
 // ===== FormData ヘルパー =====
@@ -292,6 +293,19 @@ export async function bulkRegisterItemsAction(fd: FormData): Promise<void> {
   revalidatePath("/items");
   revalidatePath("/products");
   redirect(`/items?registered=${created}&selected=${codes.length}`);
+}
+
+/**
+ * カタログの未登録品目（削除済みを除く）を全件まとめて品目マスタへ登録する（管理者のみ）。
+ * 不要品目をカタログから削除し終えたあとの初期展開用。件数上限は設けない
+ * （1つの INSERT で完結し、登録済みは自動スキップされるため）。
+ */
+export async function bulkRegisterAllItemsAction(): Promise<void> {
+  const { companyId } = await requireAdminSession();
+  const created = await bulkCreateProductsFromAllItems(companyId, ITEM_UNIT_LABELS);
+  revalidatePath("/items");
+  revalidatePath("/products");
+  redirect(`/items?registered=${created}`);
 }
 
 /** FormData の codes[] を正規化して重複排除。 */

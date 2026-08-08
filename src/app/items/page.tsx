@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { ArrowLeft, BookMarked, CheckCircle2, Search } from "lucide-react";
+import { ArrowLeft, BookMarked, CheckCircle2, PackagePlus, Search } from "lucide-react";
 import { requireAdminPage } from "@/lib/session";
 import { listItemMaster, getItemMasterImport } from "@/lib/db";
 import { ensureItemMasterSeeded, ITEM_MASTER_COUNT, ITEM_MASTER_VERSION } from "@/lib/itemMasterSeed";
 import { formatItemCode, itemUnitLabel } from "@/lib/itemCode";
 import {
   bulkDeleteItemsAction,
+  bulkRegisterAllItemsAction,
   bulkRegisterItemsAction,
   bulkRestoreItemsAction,
   reimportItemMasterAction,
@@ -50,11 +51,11 @@ export default async function ItemsPage({
   const removed = sp.removed != null ? parseInt(sp.removed, 10) : null;
   const restored = sp.restored != null ? parseInt(sp.restored, 10) : null;
 
-  let items, total, imported;
+  let items, total, imported, unregisteredTotal;
   try {
     // 初回アクセス時に同梱データ（資材W/F の品目カタログ）をこの会社へ取り込む
     await ensureItemMasterSeeded(session.companyId);
-    [{ items, total }, imported] = await Promise.all([
+    [{ items, total }, imported, { total: unregisteredTotal }] = await Promise.all([
       listItemMaster(session.companyId, {
         search,
         unregisteredOnly,
@@ -63,6 +64,8 @@ export default async function ItemsPage({
         offset: (page - 1) * PAGE_SIZE,
       }),
       getItemMasterImport(session.companyId),
+      // 「残りすべてを登録」の対象件数（未登録・削除済みを除く全件）
+      listItemMaster(session.companyId, { unregisteredOnly: true, limit: 1 }),
     ]);
   } catch (e) {
     console.error("[items]", e);
@@ -142,17 +145,33 @@ export default async function ItemsPage({
           <span className="font-semibold text-slate-800">{(imported?.itemCount ?? 0).toLocaleString()}</span> 品目を取込済み
           {imported && <span className="ml-2 text-xs text-slate-400">（資材W/F {versionLabel(imported.version)}）</span>}
         </div>
-        {imported?.version !== ITEM_MASTER_VERSION && (
-          <ConfirmForm
-            action={reimportItemMasterAction}
-            message={`資材W/F の品目カタログ（${versionLabel(ITEM_MASTER_VERSION)}・${ITEM_MASTER_COUNT.toLocaleString()}品目）を取り込みます。よろしいですか？`}
-            className="inline"
-          >
-            <button className="rounded-lg bg-fuchsia-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-fuchsia-700">
-              最新データを取り込む
-            </button>
-          </ConfirmForm>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {imported?.version !== ITEM_MASTER_VERSION && (
+            <ConfirmForm
+              action={reimportItemMasterAction}
+              message={`資材W/F の品目カタログ（${versionLabel(ITEM_MASTER_VERSION)}・${ITEM_MASTER_COUNT.toLocaleString()}品目）を取り込みます。よろしいですか？`}
+              className="inline"
+            >
+              <button className="rounded-lg bg-fuchsia-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-fuchsia-700">
+                最新データを取り込む
+              </button>
+            </ConfirmForm>
+          )}
+          {/* 不要品目を削除し終えたら、残り（未登録・削除済みを除く）を全件まとめて品目マスタへ */}
+          {!deletedView && unregisteredTotal > 0 && (
+            <ConfirmForm
+              action={bulkRegisterAllItemsAction}
+              message={`カタログの未登録 ${unregisteredTotal.toLocaleString()} 品目を、すべて品目マスタに登録します。
+（削除済みの品目は対象外・登録済みはスキップ）よろしいですか？`}
+              className="inline"
+            >
+              <button className="inline-flex items-center gap-1.5 rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800">
+                <PackagePlus className="h-3.5 w-3.5" />
+                未登録の {unregisteredTotal.toLocaleString()} 品目をすべて登録
+              </button>
+            </ConfirmForm>
+          )}
+        </div>
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
