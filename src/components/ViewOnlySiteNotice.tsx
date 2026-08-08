@@ -4,9 +4,10 @@ import { currentWorkplaceOperation } from "@/lib/workplace";
 /**
  * 「いま選んでいる職場では入出庫できない」ことの案内バナー。
  *
- * 管理者は全工場を閲覧できるが、入出庫できるのは所属工場だけ（工場に所属していない
- * ポータル管理者などは全工場で入出庫できる）。他工場の職場を選んで見ているときに、
- * ボタンが効かない理由をその場で示す。サーバー側の実施は scope.ts の assert* が行う。
+ * 閲覧・入出庫のスコープはどちらも工場基準（工場所属者は管理者でも自工場のみ、
+ * 工場未所属は制限なし）のため、通常ここに該当するのは所属工場名が工場マスタに
+ * 一致せず職場を解決できないケース。万一スコープ外の職場が選ばれていた場合の
+ * 案内も残す（安全側）。サーバー側の実施は scope.ts の assert* が行う。
  */
 export default async function ViewOnlySiteNotice({ companyId }: { companyId: string }) {
   const { workplace, operable, operableFactory } = await currentWorkplaceOperation(companyId);
@@ -22,7 +23,7 @@ export default async function ViewOnlySiteNotice({ companyId }: { companyId: str
       ) : (
         <span>
           <b>閲覧のみ</b>：入出庫できる職場が選択されていません。
-          {operableFactory}の職場が登録されているか、管理者にご確認ください。
+          {operableFactory}の職場がポータルの部署設定に登録されているかご確認ください。
         </span>
       )}
     </div>

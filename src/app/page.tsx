@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const session = await requireEntitledSession();
 
-  // 工場スコープ（一般・作業者は自工場のみ。管理者・工場未設定は全工場）
+  // 工場スコープ（工場所属者は管理者含め自工場のみ。工場未所属は全工場）
   const { siteId } = await currentScope();
 
   let workplace, operable, stock, todaysTx, stocktakes, pending, orders;

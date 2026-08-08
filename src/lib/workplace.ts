@@ -19,7 +19,7 @@ export async function getCurrentWorkplaceId(): Promise<string | null> {
 
 /**
  * 工場スコープを適用した職場一覧。
- * 一般・作業者は所属工場の職場だけ、管理者・工場未設定は全職場。
+ * 工場所属者（管理者含む）は所属工場の職場だけ、工場未所属は全職場。
  * 所属工場名に一致する工場(sites)が無いときは空を返す（安全側）。
  * 職場の切替候補・現在の職場の解決はすべてここを通す（＝スコープの適用漏れを防ぐ）。
  */
@@ -50,7 +50,7 @@ export async function currentWorkplaceLocationId(companyId: string): Promise<str
 
 /**
  * 現在の職場の「入出庫できるか」判定。
- * 管理者は他工場の職場も選べる（閲覧のため）が、入出庫は所属工場に限る。
+ * 工場未所属の人は全工場の職場を選べるが、入出庫スコープがあればその工場に限る。
  * 画面のボタン出し分けと注意バナーはこれを見る（サーバー側の実施は scope.ts の assert* が行う）。
  */
 export interface WorkplaceOperation {

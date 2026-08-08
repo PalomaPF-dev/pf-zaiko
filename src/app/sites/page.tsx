@@ -1,5 +1,6 @@
 import { Factory, Building2, Link2 } from "lucide-react";
 import { requireAdminPage } from "@/lib/session";
+import { currentScope } from "@/lib/scope";
 import { listSites, listWorkplaces } from "@/lib/db";
 import type { WorkplaceWithSite } from "@/lib/types";
 import PageHeader from "@/components/PageHeader";
@@ -13,7 +14,12 @@ export default async function SitesPage() {
 
   let sites, workplaces;
   try {
-    [sites, workplaces] = await Promise.all([listSites(companyId), listWorkplaces(companyId)]);
+    // 工場スコープ（工場所属の管理者は自工場のみ。工場に所属しない人は全工場）
+    const { siteId } = await currentScope();
+    [sites, workplaces] = await Promise.all([
+      listSites(companyId, { siteId }),
+      listWorkplaces(companyId, { siteId }),
+    ]);
   } catch (e) {
     console.error("[sites]", e);
     return (

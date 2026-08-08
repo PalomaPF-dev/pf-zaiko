@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "./authOptions";
 import { getCompanyEntitlement } from "./entitlement";
-import { getUserRole, getUserRoleAndFactory, type UserRole } from "./authDb";
+import { getUserRole, getUserRoleAndFactory } from "./authDb";
 
 export interface AppSession {
   companyId: string;
@@ -82,18 +82,19 @@ export async function requireAdminPage(): Promise<AppSession> {
 }
 
 /**
- * 工場スコープ（データ表示制限）の判定。
- * - 管理者（role='admin'）と工場未設定（factory=NULL）ユーザー → null（全工場を閲覧可）
- * - それ以外（工場所属の一般・作業者） → 所属工場名（その工場＝sites 配下のデータのみ閲覧可）
+ * 工場スコープ（データ表示制限）の判定。**役割では緩めない**（入出庫スコープと同じ工場基準）。
+ * - 工場に所属するユーザー（ポータルの部署が「工場」種別＝factory 非NULL） → その工場名。
+ *   その工場（＝sites）配下のデータだけを閲覧できる。**管理者も同じ＝自分の工場だけ**。
+ * - 工場に所属しないユーザー（ポータル管理者・工場でない部署＝factory=NULL） → null（全工場を閲覧可）。
  */
-export function factoryScopeOf(role: UserRole | null, factory: string | null): string | null {
-  return role === "admin" ? null : factory;
+export function factoryScopeOf(factory: string | null): string | null {
+  return factory;
 }
 
 /**
- * 入出庫スコープ（データ更新制限）の判定。閲覧スコープと違い、**役割では緩まない**。
+ * 入出庫スコープ（データ更新制限）の判定。閲覧スコープと同じ工場基準（役割では緩まない）。
  * - 工場に所属しているユーザー（ポータルの部署が「工場」種別） → その工場でしか入出庫できない。
- *   管理者も同じ。管理者は全工場を「見られる」が、入出庫できるのは自分の工場だけ。
+ *   管理者も同じ。
  * - 工場に所属していないユーザー（ポータル管理者など部署が工場でない） → null＝全工場で入出庫可。
  */
 export function operationScopeOf(factory: string | null): string | null {
@@ -118,7 +119,7 @@ async function withFactory(s: AppSession): Promise<ScopedSession> {
     ...s,
     role: effectiveRole,
     factory,
-    factoryScope: factoryScopeOf(effectiveRole, factory),
+    factoryScope: factoryScopeOf(factory),
     operationScope: operationScopeOf(factory),
   };
 }

@@ -48,7 +48,7 @@ export async function ensureAuthSchema(): Promise<void> {
   // 承認者の社員番号（ポータル provision v2 で連携・冪等追加）。NULL = 未設定。
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS approver_login_id TEXT`;
   // 所属工場（ポータルの部署が「工場」種別のときだけ値が入る）。NULL = 未設定＝全工場を閲覧可。
-  // 一般・作業者で factory が非NULLのユーザーは、その工場（sites）配下のデータだけを閲覧できる。
+  // factory が非NULLのユーザーは役割によらず（管理者も）、その工場（sites）配下のデータだけを閲覧できる。
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS factory TEXT`;
   // 社員番号ログイン（login_id）への移行。email は任意（社内は未登録の社員が多い）。
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS login_id TEXT`;
