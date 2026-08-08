@@ -30,11 +30,11 @@ export async function ensureAuthSchema(): Promise<void> {
       created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`;
   await sql`CREATE INDEX IF NOT EXISTS users_company_id_idx ON users(company_id)`;
-  // 役割。既定は member（管理者は初期セットアップ /register または招待で明示的に付与）。
+  // 役割。既定は member（管理者はポータルのプロビジョニングまたは招待で明示的に付与）。
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT`;
   await sql`UPDATE users SET role = 'member' WHERE role IS NULL`;
   // 一度きり：社内化前に既存ユーザーを誤って管理者へ一括昇格していたのを是正（全員 member に戻す）。
-  // 管理者は各アプリの初期セットアップ(/register)で作成する。pf_migrations で二度は実行しない。
+  // 管理者はポータルのプロビジョニングで発行する。pf_migrations で二度は実行しない。
   await sql`CREATE TABLE IF NOT EXISTS pf_migrations (key TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
   {
     const applied = await sql`SELECT 1 FROM pf_migrations WHERE key = 'reset_roles_member_v1' LIMIT 1`;
