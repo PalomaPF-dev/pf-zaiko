@@ -9,12 +9,9 @@ import {
   Truck,
   PackageCheck,
   Factory,
-  CheckCircle2,
-  Circle,
-  Sparkles,
 } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
-import { listStock, listTransactions, listStocktakes, listSites, listPendingPutaway, listIssueOrders } from "@/lib/db";
+import { listStock, listTransactions, listStocktakes, listPendingPutaway, listIssueOrders } from "@/lib/db";
 import { currentWorkplaceOperation } from "@/lib/workplace";
 import { currentScope } from "@/lib/scope";
 import { formatDateTime, todayJST } from "@/lib/format";
@@ -30,16 +27,12 @@ export default async function DashboardPage() {
   const session = await requireEntitledSession();
 
   // 工場スコープ（一般・作業者は自工場のみ。管理者・工場未設定は全工場）
-  const { scope, siteId } = await currentScope();
+  const { siteId } = await currentScope();
 
-  let workplace, operable, sites, stock, todaysTx, stocktakes, pending, orders;
+  let workplace, operable, stock, todaysTx, stocktakes, pending, orders;
   try {
-    const [op, siteRows] = await Promise.all([
-      currentWorkplaceOperation(session.companyId),
-      listSites(session.companyId, { siteId }),
-    ]);
+    const op = await currentWorkplaceOperation(session.companyId);
     ({ workplace, operable } = op);
-    sites = siteRows;
     if (workplace) {
       [stock, todaysTx, stocktakes, pending, orders] = await Promise.all([
         listStock(session.companyId, { workplaceId: workplace.id, nonZeroOnly: false }),
@@ -59,35 +52,13 @@ export default async function DashboardPage() {
     );
   }
 
-  // 未セットアップ（工場・職場が無い）の案内。
-  // 工場スコープが効いているユーザーには、セットアップ手順ではなく「表示できるデータが無い」旨を出す
-  // （工場・職場の登録は管理者のみ）。
-  if (!workplace && scope) {
-    return (
-      <div className="p-4 sm:p-6">
-        <PageHeader title="ダッシュボード" description={`${session.companyName} の副資材在庫`} />
-        <NoWorkplaceState />
-      </div>
-    );
-  }
+  // 職場が無い（表示できるデータが無い）ときの空状態。
+  // 初期設定（工場・職場の登録）はポータルで管理する。
   if (!workplace) {
     return (
       <div className="p-4 sm:p-6">
         <PageHeader title="ダッシュボード" description={`${session.companyName} の副資材在庫`} />
-        <section className="rounded-2xl border-2 border-fuchsia-200 bg-fuchsia-50/60 p-4 sm:p-5">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-fuchsia-800">
-            <Sparkles className="h-4 w-4" />
-            はじめての設定
-          </h2>
-          <p className="mt-1 text-xs text-fuchsia-700/80">
-            副資材の在庫は職場ごとに管理します。次の順で準備してください。
-          </p>
-          <ol className="mt-3 space-y-2">
-            <SetupStep done={sites.length > 0} label="① 工場・職場を登録する" description="工場を作り、その中に職場を登録します（在庫は職場ごとに独立）" href="/sites" linkLabel="工場・職場へ" />
-            <SetupStep done={false} label="② 副資材を登録する" description="品名とメーカー品番で品目マスタに登録します" href="/products/new" linkLabel="副資材を登録" />
-            <SetupStep done={false} label="③ ロケーションを作成する" description="職場の中に棚位置（エリア-棚-段-間口）を登録します" href="/locations/new" linkLabel="ロケを作成" />
-          </ol>
-        </section>
+        <NoWorkplaceState />
       </div>
     );
   }
@@ -242,39 +213,6 @@ export default async function DashboardPage() {
         </section>
       </div>
     </div>
-  );
-}
-
-function SetupStep({
-  done,
-  label,
-  description,
-  href,
-  linkLabel,
-}: {
-  done: boolean;
-  label: string;
-  description: string;
-  href: string;
-  linkLabel: string;
-}) {
-  return (
-    <li className="flex flex-wrap items-center gap-3 rounded-xl border border-fuchsia-100 bg-white px-3 py-2.5">
-      {done ? (
-        <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
-      ) : (
-        <Circle className="h-5 w-5 shrink-0 text-slate-300" />
-      )}
-      <div className="min-w-0 flex-1">
-        <div className={`text-sm font-semibold ${done ? "text-slate-400 line-through" : "text-slate-800"}`}>{label}</div>
-        <div className="text-xs text-slate-400">{description}</div>
-      </div>
-      {!done && (
-        <Link href={href} className="shrink-0 rounded-lg bg-fuchsia-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-fuchsia-700">
-          {linkLabel}
-        </Link>
-      )}
-    </li>
   );
 }
 
