@@ -68,6 +68,7 @@ import {
   putawayProduct,
   bulkCreateProductsFromItems,
   bulkDeleteProducts,
+  bulkSetProductCategory,
   getItemMastersByCodes,
   setItemMasterHidden,
   type ProductInput,
@@ -230,6 +231,22 @@ export async function bulkDeleteProductsAction(fd: FormData): Promise<void> {
   revalidatePath("/products");
   revalidatePath("/items");
   redirect(`/products?deleted=${deleted}&selected=${ids.length}`);
+}
+
+/**
+ * 選択した品目の分類をまとめて設定する（管理者のみ）。空欄で実行すると未分類に戻す。
+ * カタログから一括登録した品目の分類分けを、一覧上で完結させるためのアクション。
+ */
+export async function bulkSetCategoryAction(fd: FormData): Promise<void> {
+  const { companyId } = await requireAdminSession();
+  const ids = Array.from(
+    new Set(fd.getAll("ids").map(String).filter((v) => UUID_INPUT_RE.test(v)))
+  );
+  if (ids.length === 0) redirect("/products");
+  const category = strOrNull(fd, "category");
+  const n = await bulkSetProductCategory(companyId, ids, category);
+  revalidatePath("/products");
+  redirect(`/products?categorized=${n}${category ? `&cat=${encodeURIComponent(category)}` : ""}`);
 }
 
 // ===== 資材W/F 品目カタログ =====

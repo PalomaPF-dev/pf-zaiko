@@ -360,10 +360,18 @@ export interface ProductInput {
   active: boolean;
 }
 
-/** 品目一覧（現在庫合計・在庫ロケ数つき）。検索語（図番/品名/規格/分類/メーカー）で絞り込み。 */
+/** 品目一覧（現在庫合計・在庫ロケ数つき）。検索語（図番/品名/規格/分類/メーカー）・分類で絞り込み。 */
 export async function listProducts(
   companyId: string,
-  opts: { search?: string | null; activeOnly?: boolean; belowSafetyOnly?: boolean } = {}
+  opts: {
+    search?: string | null;
+    activeOnly?: boolean;
+    belowSafetyOnly?: boolean;
+    /** 分類の完全一致で絞る（null/未指定は全分類） */
+    category?: string | null;
+    /** 分類が未設定の品目だけに絞る */
+    uncategorizedOnly?: boolean;
+  } = {}
 ): Promise<ProductWithStock[]> {
   await ensureSchema();
   const sql = getSql();
@@ -379,6 +387,8 @@ export async function listProducts(
     ) s ON s.product_id = p.id
     WHERE p.company_id = ${companyId}
       AND (${opts.activeOnly ? true : null}::boolean IS NULL OR p.active = true)
+      AND (${opts.category ?? null}::text IS NULL OR p.category = ${opts.category ?? null})
+      AND (${opts.uncategorizedOnly ? true : null}::boolean IS NULL OR p.category IS NULL OR p.category = '')
       AND (${like}::text IS NULL
            OR p.drawing_no ILIKE ${like} OR p.product_code ILIKE ${like} OR p.stock_key ILIKE ${like}
            OR p.maker_code ILIKE ${like}
@@ -465,6 +475,26 @@ export async function deleteProduct(companyId: string, id: string): Promise<void
   await ensureSchema();
   const sql = getSql();
   await sql`DELETE FROM products WHERE company_id = ${companyId} AND id = ${id}`;
+}
+
+/**
+ * 選択した品目の分類をまとめて設定する（category=null で未分類に戻す）。
+ * カタログから一括登録した品目には分類が付いていないため、後からまとめて分類分けする用。
+ * @returns 更新した件数
+ */
+export async function bulkSetProductCategory(
+  companyId: string,
+  ids: string[],
+  category: string | null
+): Promise<number> {
+  await ensureSchema();
+  if (ids.length === 0) return 0;
+  const sql = getSql();
+  const rows = await sql`
+    UPDATE products SET category = ${category}, updated_at = NOW()
+    WHERE company_id = ${companyId} AND id = ANY(${ids}::uuid[])
+    RETURNING id`;
+  return rows.length;
 }
 
 /**
