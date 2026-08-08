@@ -12,7 +12,7 @@ const input =
   "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-1 focus:ring-fuchsia-500";
 
 export default async function SettingsPage() {
-  const { companyId, email, role, isDemo } = await requireEntitledSession();
+  const { companyId, email, role } = await requireEntitledSession();
   const isAdmin = role === "admin";
   const settings = await getCompanySettings(companyId);
 
@@ -32,7 +32,7 @@ export default async function SettingsPage() {
           <p className="mb-4 text-xs text-slate-400">
             安全在庫を下回った品目を毎日の定期チェックで検出し、以下のアドレスへメール通知します。
             カンマ区切りで複数指定できます。未設定なら登録ユーザー全員
-            {isDemo || !email ? "（メールアドレス登録済みの方）" : `（${email} など）`}に送信します。
+            {!email ? "（メールアドレス登録済みの方）" : `（${email} など）`}に送信します。
           </p>
           <form action={updateNotifyEmailsAction} className="flex flex-col gap-4">
             <textarea
