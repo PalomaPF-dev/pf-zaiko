@@ -1,23 +1,28 @@
 import Link from "next/link";
-import { BookMarked, Package, Plus, Search } from "lucide-react";
+import { BookMarked, CheckCircle2, Package, Plus, Search } from "lucide-react";
 import { requireAdminPage } from "@/lib/session";
 import { listProducts } from "@/lib/db";
+import { bulkDeleteProductsAction } from "@/lib/actions";
 import PageHeader from "@/components/PageHeader";
 import { BelowSafetyBadge } from "@/components/Badges";
 import DbErrorState from "@/components/DbErrorState";
 import MasterTabs from "@/components/MasterTabs";
+import ProductBulkDeleteForm from "@/components/ProductBulkDeleteForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; below?: string }>;
+  searchParams: Promise<{ q?: string; below?: string; deleted?: string; selected?: string }>;
 }) {
   const session = await requireAdminPage();
   const sp = await searchParams;
   const search = sp.q?.trim() || null;
   const belowOnly = sp.below === "1";
+  // 一括削除直後のリダイレクトで結果を受け取る（deleted=削除数 / selected=選択数）
+  const deleted = sp.deleted != null ? parseInt(sp.deleted, 10) : null;
+  const selectedCount = sp.selected != null ? parseInt(sp.selected, 10) : null;
 
   let products;
   try {
@@ -57,6 +62,20 @@ export default async function ProductsPage({
           </div>
         }
       />
+
+      {deleted != null && Number.isFinite(deleted) && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            {deleted.toLocaleString()} 品目を削除しました。
+            {selectedCount != null && selectedCount > deleted && (
+              <span className="ml-1 text-emerald-700/80">
+                （{(selectedCount - deleted).toLocaleString()} 品目は受払履歴があるためスキップ。履歴のある品目は編集画面で無効化してください）
+              </span>
+            )}
+          </span>
+        </div>
+      )}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <form className="flex flex-1 items-center gap-2">
@@ -101,10 +120,12 @@ export default async function ProductsPage({
           )}
         </div>
       ) : (
+        <ProductBulkDeleteForm action={bulkDeleteProductsAction} rowCount={products.length}>
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-500">
+                <th className="w-10 px-3 py-2.5"><span className="sr-only">選択</span></th>
                 <th className="px-4 py-2.5">図番</th>
                 <th className="px-4 py-2.5">品名</th>
                 <th className="hidden px-4 py-2.5 sm:table-cell">分類</th>
@@ -114,6 +135,15 @@ export default async function ProductsPage({
             <tbody className="divide-y divide-slate-100">
               {products.map((p) => (
                 <tr key={p.id} className={`hover:bg-slate-50 ${!p.active ? "opacity-50" : ""}`}>
+                  <td className="px-3 py-2.5">
+                    <input
+                      type="checkbox"
+                      name="ids"
+                      value={p.id}
+                      title="一括削除の対象（受払履歴のある品目はスキップされます）"
+                      className="h-4 w-4 rounded border-slate-300 text-fuchsia-600 focus:ring-fuchsia-500"
+                    />
+                  </td>
                   <td className="px-4 py-2.5">
                     <Link href={`/products/${p.id}`} className="font-mono font-medium text-slate-800 hover:text-fuchsia-600">
                       {p.drawingNo}
@@ -142,6 +172,7 @@ export default async function ProductsPage({
             </tbody>
           </table>
         </div>
+        </ProductBulkDeleteForm>
       )}
     </div>
   );

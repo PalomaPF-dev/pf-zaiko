@@ -467,6 +467,26 @@ export async function deleteProduct(companyId: string, id: string): Promise<void
   await sql`DELETE FROM products WHERE company_id = ${companyId} AND id = ${id}`;
 }
 
+/**
+ * 品目マスタの一括削除。**受払履歴・入荷明細・出庫明細のある品目はスキップ**する
+ * （証跡を壊さないため。FK も RESTRICT なので消せない）。在庫0・履歴なしの
+ * 登録間違いをまとめて消す用途（一括登録のやり直しなど）。
+ * @returns 実際に削除した件数（選択数との差 = スキップ数）
+ */
+export async function bulkDeleteProducts(companyId: string, ids: string[]): Promise<number> {
+  await ensureSchema();
+  if (ids.length === 0) return 0;
+  const sql = getSql();
+  const rows = await sql`
+    DELETE FROM products p
+    WHERE p.company_id = ${companyId} AND p.id = ANY(${ids}::uuid[])
+      AND NOT EXISTS (SELECT 1 FROM transactions t WHERE t.product_id = p.id)
+      AND NOT EXISTS (SELECT 1 FROM receipt_lines rl WHERE rl.product_id = p.id)
+      AND NOT EXISTS (SELECT 1 FROM issue_order_lines il WHERE il.product_id = p.id)
+    RETURNING id`;
+  return rows.length;
+}
+
 /** 分類の候補（フィルタ用の distinct）。 */
 export async function listCategories(companyId: string): Promise<string[]> {
   await ensureSchema();
@@ -498,6 +518,7 @@ function mapItemMaster(r: any): ItemMaster {
     validFrom: r.valid_from,
     validTo: r.valid_to,
     active: Boolean(r.active),
+    hidden: Boolean(r.hidden),
   };
 }
 
@@ -510,6 +531,8 @@ export interface ItemMasterFilter {
   activeOnly?: boolean;
   /** 品目マスタに未登録の品目だけに絞る */
   unregisteredOnly?: boolean;
+  /** true: 削除済み（非表示）だけを返す。省略時は削除済みを除く */
+  deletedOnly?: boolean;
   limit?: number;
   offset?: number;
 }
@@ -535,6 +558,7 @@ export async function listItemMaster(
     FROM item_master i
     LEFT JOIN products p ON p.company_id = i.company_id AND p.drawing_no = i.code
     WHERE i.company_id = ${companyId}
+      AND i.hidden = ${filter.deletedOnly ? true : false}
       AND (${filter.activeOnly ? true : null}::boolean IS NULL OR i.active = true)
       AND (${filter.unregisteredOnly ? true : null}::boolean IS NULL OR p.id IS NULL)
       AND (${like}::text IS NULL
@@ -564,16 +588,36 @@ export async function getItemMasterByCode(
   return rows[0] ? mapItemMasterWithProduct(rows[0]) : null;
 }
 
-/** 品目コードの配列でカタログを引く（一括登録の対象確認用）。存在しないコードは結果に出ない。 */
+/** 品目コードの配列でカタログを引く（一括登録の対象確認用）。存在しない・削除済みのコードは結果に出ない。 */
 export async function getItemMastersByCodes(companyId: string, codes: string[]): Promise<ItemMaster[]> {
   await ensureSchema();
   if (codes.length === 0) return [];
   const sql = getSql();
   const rows = await sql`
     SELECT * FROM item_master
-    WHERE company_id = ${companyId} AND code = ANY(${codes})
+    WHERE company_id = ${companyId} AND code = ANY(${codes}) AND NOT hidden
     ORDER BY code`;
   return rows.map(mapItemMaster);
+}
+
+/**
+ * カタログの削除（hidden=true）／復元（hidden=false）。
+ * 行は消さないため、W/F 新版の取込（UPSERT）後も削除状態が維持される。
+ * @returns 変更した件数
+ */
+export async function setItemMasterHidden(
+  companyId: string,
+  codes: string[],
+  hidden: boolean
+): Promise<number> {
+  await ensureSchema();
+  if (codes.length === 0) return 0;
+  const sql = getSql();
+  const rows = await sql`
+    UPDATE item_master SET hidden = ${hidden}, updated_at = NOW()
+    WHERE company_id = ${companyId} AND code = ANY(${codes}) AND hidden = ${!hidden}
+    RETURNING code`;
+  return rows.length;
 }
 
 /** 一括登録の1件（単位はカタログの単位コードから解決済み。未解決なら null＝既定の「個」） */
@@ -610,7 +654,7 @@ export async function bulkCreateProductsFromItems(
              COALESCE(NULLIF(input.unit, ''), '個') AS unit,
              row_number() OVER (ORDER BY i.code) AS rn
       FROM input
-      JOIN item_master i ON i.company_id = ${companyId} AND i.code = input.code
+      JOIN item_master i ON i.company_id = ${companyId} AND i.code = input.code AND NOT i.hidden
       WHERE NOT EXISTS (
         SELECT 1 FROM products p WHERE p.company_id = ${companyId} AND p.drawing_no = i.code)
     )

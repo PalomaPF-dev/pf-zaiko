@@ -29,7 +29,7 @@ export default async function NewProductPage({
     try {
       await ensureItemMasterSeeded(companyId);
       const found = await getItemMasterByCode(companyId, code);
-      if (found) {
+      if (found && !found.hidden) {
         initialItem = {
           ...found,
           unitLabel: itemUnitLabel(found.unitCode),

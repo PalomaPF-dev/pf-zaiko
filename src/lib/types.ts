@@ -116,6 +116,7 @@ export interface ItemMaster {
   validFrom: string | null; // 有効開始日（YYYYMMDD）
   validTo: string | null; // 有効終了日（YYYYMMDD）
   active: boolean; // 取込時点で有効な品目か
+  hidden: boolean; // カタログから削除（非表示）済みか。「削除済み」から元に戻せる
 }
 
 /** 品目カタログ＋品目マスタへの登録状況（一覧・呼び出し用） */

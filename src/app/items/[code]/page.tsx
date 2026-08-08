@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, PackagePlus } from "lucide-react";
+import { ArrowLeft, PackagePlus, Trash2, Undo2 } from "lucide-react";
 import { requireAdminPage } from "@/lib/session";
 import { getItemMasterByCode } from "@/lib/db";
 import { ensureItemMasterSeeded } from "@/lib/itemMasterSeed";
 import { formatItemCode, itemUnitLabel, normalizeItemCode } from "@/lib/itemCode";
+import { bulkDeleteItemsAction, bulkRestoreItemsAction } from "@/lib/actions";
 import PageHeader from "@/components/PageHeader";
 import DbErrorState from "@/components/DbErrorState";
 import MasterTabs from "@/components/MasterTabs";
+import ConfirmForm from "@/components/ConfirmForm";
 
 export const dynamic = "force-dynamic";
 
@@ -58,24 +60,58 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ cod
         title={item.name}
         description={`品目コード ${formatItemCode(item.code)}${item.active ? "" : "（廃止品目）"}`}
         action={
-          item.productId ? (
-            <Link
-              href={`/products/${item.productId}`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          item.hidden ? (
+            // 削除済み: 復元だけを出す（登録はカタログへ戻してから）
+            <ConfirmForm
+              action={bulkRestoreItemsAction}
+              message={`「${item.name}」をカタログに戻します。よろしいですか？`}
             >
-              品目マスタを開く
-            </Link>
+              <input type="hidden" name="codes" value={item.code} />
+              <button className="inline-flex items-center gap-1.5 rounded-lg bg-slate-700 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+                <Undo2 className="h-4 w-4" />
+                カタログに戻す
+              </button>
+            </ConfirmForm>
           ) : (
-            <Link
-              href={`/products/new?item=${item.code}`}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700"
-            >
-              <PackagePlus className="h-4 w-4" />
-              品目マスタに登録
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              {!item.productId && (
+                <ConfirmForm
+                  action={bulkDeleteItemsAction}
+                  message={`「${item.name}」をカタログから削除します。\n（「削除済み」フィルタからいつでも元に戻せます）`}
+                >
+                  <input type="hidden" name="codes" value={item.code} />
+                  <button className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
+                    <Trash2 className="h-4 w-4" />
+                    削除
+                  </button>
+                </ConfirmForm>
+              )}
+              {item.productId ? (
+                <Link
+                  href={`/products/${item.productId}`}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  品目マスタを開く
+                </Link>
+              ) : (
+                <Link
+                  href={`/products/new?item=${item.code}`}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700"
+                >
+                  <PackagePlus className="h-4 w-4" />
+                  品目マスタに登録
+                </Link>
+              )}
+            </div>
           )
         }
       />
+
+      {item.hidden && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          この品目はカタログから削除されています。一覧・検索・品目コード呼び出しには表示されません。
+        </div>
+      )}
 
       <dl className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
         <Row label="品目コード">

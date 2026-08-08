@@ -4,7 +4,12 @@ import { requireAdminPage } from "@/lib/session";
 import { listItemMaster, getItemMasterImport } from "@/lib/db";
 import { ensureItemMasterSeeded, ITEM_MASTER_COUNT, ITEM_MASTER_VERSION } from "@/lib/itemMasterSeed";
 import { formatItemCode, itemUnitLabel } from "@/lib/itemCode";
-import { bulkRegisterItemsAction, reimportItemMasterAction } from "@/lib/actions";
+import {
+  bulkDeleteItemsAction,
+  bulkRegisterItemsAction,
+  bulkRestoreItemsAction,
+  reimportItemMasterAction,
+} from "@/lib/actions";
 import PageHeader from "@/components/PageHeader";
 import DbErrorState from "@/components/DbErrorState";
 import MasterTabs from "@/components/MasterTabs";
@@ -23,16 +28,27 @@ function versionLabel(v: string): string {
 export default async function ItemsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; page?: string; only?: string; registered?: string; selected?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    page?: string;
+    only?: string;
+    registered?: string;
+    selected?: string;
+    removed?: string;
+    restored?: string;
+  }>;
 }) {
   const session = await requireAdminPage();
   const sp = await searchParams;
   const search = sp.q?.trim() || null;
   const unregisteredOnly = sp.only === "new";
+  const deletedView = sp.only === "deleted";
   const page = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
-  // 一括登録直後のリダイレクトで結果を受け取る（registered=登録数 / selected=選択数）
+  // 一括操作直後のリダイレクトで結果を受け取る（registered=登録数 / selected=選択数 / removed=削除数 / restored=復元数）
   const registered = sp.registered != null ? parseInt(sp.registered, 10) : null;
   const selectedCount = sp.selected != null ? parseInt(sp.selected, 10) : null;
+  const removed = sp.removed != null ? parseInt(sp.removed, 10) : null;
+  const restored = sp.restored != null ? parseInt(sp.restored, 10) : null;
 
   let items, total, imported;
   try {
@@ -42,6 +58,7 @@ export default async function ItemsPage({
       listItemMaster(session.companyId, {
         search,
         unregisteredOnly,
+        deletedOnly: deletedView,
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
       }),
@@ -62,6 +79,7 @@ export default async function ItemsPage({
     const p = new URLSearchParams();
     if (search) p.set("q", search);
     if (unregisteredOnly) p.set("only", "new");
+    if (deletedView) p.set("only", "deleted");
     for (const [k, v] of Object.entries(over)) {
       if (v == null) p.delete(k);
       else p.set(k, v);
@@ -82,6 +100,28 @@ export default async function ItemsPage({
         description="資材W/F に登録されている品目の一覧です。現物在庫として管理する品目だけをチェックして、品目マスタへ一括登録してください（保守・処理・運賃などの役務・費用系は登録不要です）。"
       />
 
+      {removed != null && Number.isFinite(removed) && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            {removed.toLocaleString()} 品目をカタログから削除しました。
+            <Link href="/items?only=deleted" className="ml-2 font-semibold underline">
+              削除済みを確認 →
+            </Link>
+          </span>
+        </div>
+      )}
+      {restored != null && Number.isFinite(restored) && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            {restored.toLocaleString()} 品目をカタログに戻しました。
+            <Link href="/items" className="ml-2 font-semibold underline">
+              カタログへ →
+            </Link>
+          </span>
+        </div>
+      )}
       {registered != null && Number.isFinite(registered) && (
         <div className="mb-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
@@ -141,13 +181,27 @@ export default async function ItemsPage({
         >
           未登録のみ
         </Link>
+        <Link
+          href={deletedView ? query({ only: undefined, page: undefined }) : query({ only: "deleted", page: undefined })}
+          className={`rounded-lg border px-3 py-2 text-sm font-medium ${
+            deletedView
+              ? "border-red-400 bg-red-50 text-red-700"
+              : "border-slate-300 text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          削除済み
+        </Link>
       </div>
 
       {items.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
           <BookMarked className="mx-auto mb-3 h-8 w-8 text-slate-300" />
           <p className="text-sm text-slate-500">
-            {search || unregisteredOnly ? "該当する品目がありません。" : "品目カタログがまだ取り込まれていません。"}
+            {deletedView
+              ? "削除済みの品目はありません。"
+              : search || unregisteredOnly
+                ? "該当する品目がありません。"
+                : "品目カタログがまだ取り込まれていません。"}
           </p>
         </div>
       ) : (
@@ -156,7 +210,13 @@ export default async function ItemsPage({
             {total.toLocaleString()}件中 {((page - 1) * PAGE_SIZE + 1).toLocaleString()}〜
             {Math.min(page * PAGE_SIZE, total).toLocaleString()}件
           </p>
-          <ItemBulkRegisterForm action={bulkRegisterItemsAction} selectableCount={items.filter((it) => !it.productId).length}>
+          <ItemBulkRegisterForm
+            mode={deletedView ? "deleted" : "active"}
+            registerAction={bulkRegisterItemsAction}
+            deleteAction={bulkDeleteItemsAction}
+            restoreAction={bulkRestoreItemsAction}
+            selectableCount={deletedView ? items.length : items.filter((it) => !it.productId).length}
+          >
           <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
             <table className="w-full text-sm">
               <thead>
@@ -178,8 +238,14 @@ export default async function ItemsPage({
                         type="checkbox"
                         name="codes"
                         value={it.code}
-                        disabled={it.productId != null}
-                        title={it.productId ? "登録済み" : "品目マスタに登録する"}
+                        disabled={!deletedView && it.productId != null}
+                        title={
+                          deletedView
+                            ? "元に戻す対象"
+                            : it.productId
+                              ? "登録済み（削除は品目マスタ側から）"
+                              : "一括登録・削除の対象"
+                        }
                         className="h-4 w-4 rounded border-slate-300 text-fuchsia-600 focus:ring-fuchsia-500 disabled:opacity-30"
                       />
                     </td>
@@ -206,6 +272,8 @@ export default async function ItemsPage({
                         <Link href={`/products/${it.productId}`} className="text-xs font-semibold text-emerald-700 hover:underline">
                           登録済み
                         </Link>
+                      ) : deletedView ? (
+                        <span className="text-xs text-slate-400">削除済み</span>
                       ) : (
                         <Link
                           href={`/products/new?item=${it.code}`}

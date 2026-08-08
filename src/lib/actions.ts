@@ -67,7 +67,9 @@ import {
   deleteReceiptLine,
   putawayProduct,
   bulkCreateProductsFromItems,
+  bulkDeleteProducts,
   getItemMastersByCodes,
+  setItemMasterHidden,
   type ProductInput,
   type PartnerInput,
 } from "./db";
@@ -199,9 +201,35 @@ export async function updateProductAction(id: string, fd: FormData): Promise<Act
 
 export async function deleteProductAction(id: string): Promise<void> {
   const { companyId } = await requireAdminSession();
-  await deleteProduct(companyId, id);
+  try {
+    await deleteProduct(companyId, id);
+  } catch (e: any) {
+    // 23503: FK違反＝受払履歴・入荷/出庫明細が残っている（証跡保護のため削除不可）
+    const code = e?.code ?? e?.sourceError?.code;
+    if (code === "23503") redirect(`/products/${id}/edit?error=history`);
+    throw e;
+  }
   revalidatePath("/products");
+  revalidatePath("/items");
   redirect("/products");
+}
+
+const UUID_INPUT_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * 品目マスタの一括削除（管理者のみ）。一括登録のやり直し用。
+ * 受払履歴・入荷/出庫明細のある品目はスキップされる（結果はバナーで通知）。
+ */
+export async function bulkDeleteProductsAction(fd: FormData): Promise<void> {
+  const { companyId } = await requireAdminSession();
+  const ids = Array.from(
+    new Set(fd.getAll("ids").map(String).filter((v) => UUID_INPUT_RE.test(v)))
+  );
+  if (ids.length === 0) redirect("/products");
+  const deleted = await bulkDeleteProducts(companyId, ids);
+  revalidatePath("/products");
+  revalidatePath("/items");
+  redirect(`/products?deleted=${deleted}&selected=${ids.length}`);
 }
 
 // ===== 資材W/F 品目カタログ =====
@@ -247,6 +275,42 @@ export async function bulkRegisterItemsAction(fd: FormData): Promise<void> {
   revalidatePath("/items");
   revalidatePath("/products");
   redirect(`/items?registered=${created}&selected=${codes.length}`);
+}
+
+/** FormData の codes[] を正規化して重複排除。 */
+function readItemCodes(fd: FormData): string[] {
+  return Array.from(
+    new Set(
+      fd
+        .getAll("codes")
+        .map((v) => normalizeItemCode(String(v)))
+        .filter((c): c is string => c != null)
+    )
+  );
+}
+
+/**
+ * カタログで選択した品目を削除（非表示に）する（管理者のみ）。
+ * 役務・費用系など在庫管理に不要な品目を一覧から外す用途。行は消さないため
+ * W/F 新版の取込でも復活せず、「削除済み」フィルタからいつでも元に戻せる。
+ */
+export async function bulkDeleteItemsAction(fd: FormData): Promise<void> {
+  const { companyId } = await requireAdminSession();
+  const codes = readItemCodes(fd);
+  if (codes.length === 0) redirect("/items");
+  const n = await setItemMasterHidden(companyId, codes, true);
+  revalidatePath("/items");
+  redirect(`/items?removed=${n}`);
+}
+
+/** 削除済み（非表示）の品目をカタログへ元に戻す（管理者のみ）。 */
+export async function bulkRestoreItemsAction(fd: FormData): Promise<void> {
+  const { companyId } = await requireAdminSession();
+  const codes = readItemCodes(fd);
+  if (codes.length === 0) redirect("/items?only=deleted");
+  const n = await setItemMasterHidden(companyId, codes, false);
+  revalidatePath("/items");
+  redirect(`/items?only=deleted&restored=${n}`);
 }
 
 // ===== ロケーション =====
