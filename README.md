@@ -14,10 +14,9 @@ QRラベルで商品とロケーションを管理し、入出庫・受払履歴
 ## 技術構成
 
 - Next.js 16（App Router）+ Tailwind CSS 4 — 他のPalomaシリーズと同一パターン
-- Neon Postgres（`DATABASE_URL`）/ next-auth（会社＋ユーザー、30日トライアル、使い捨てデモ）
+- Neon Postgres（`DATABASE_URL`）/ next-auth（会社＋ユーザー、30日トライアル）
 - QR生成 `qrcode` / QRスキャン `html5-qrcode`
 - Stripe サブスク / Resend（アラートメール）
-- Capacitor リモート読込（iOS アプリ化用、`jp.paloma-pf.zaiko`）
 
 ## データモデル
 
