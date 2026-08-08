@@ -50,14 +50,14 @@ export default function GuidePage() {
       {/* ===== セットアップ ===== */}
       <h2 className="mb-4 border-l-4 border-fuchsia-600 pl-3 text-lg font-bold text-slate-800">初期セットアップ（管理者）</h2>
       <div className="flex flex-col gap-4">
-        <GuideStep no={1} icon={ShieldCheck} title="作業者を登録する" href="/settings" linkLabel="設定を開く">
-          ログインアカウントの発行は<b>ポータル</b>で行います。アプリでは「マスタ設定」の<b>作業者管理</b>に
-          現場の担当者の名前を登録すると、入出庫・棚卸の記録時に<b>作業者を選択</b>できます。
-          在庫アラートの通知先やマイナス在庫の許容もここで設定できます。
+        <GuideStep no={1} icon={ShieldCheck} title="在庫ルールを確認する" href="/settings" linkLabel="設定を開く">
+          ログインアカウントの発行・所属の設定は<b>ポータル</b>で行います。アプリの「マスタ設定」では
+          <b>マイナス在庫の許容</b>など、在庫の運用ルールを設定できます。
         </GuideStep>
 
-        <GuideStep no={2} icon={Factory} title="工場・職場を登録する" href="/sites" linkLabel="工場・職場">
-          工場を作り、その中に<b>職場</b>（組立ライン・塗装ブース・検査室 など）を登録します。<b>在庫は職場ごとに独立</b>して管理されます。
+        <GuideStep no={2} icon={Factory} title="工場・職場を確認する" href="/sites" linkLabel="工場・職場">
+          工場と<b>職場</b>（組立ライン・塗装ブース・検査室 など）は<b>ポータルの部署設定</b>で登録すると、
+          この在庫管理へ自動で連動されます。<b>在庫は職場ごとに独立</b>して管理されます。
         </GuideStep>
 
         <GuideStep no={3} icon={MapPin} title="ロケーション（棚）を採番する" href="/locations/new" linkLabel="ロケを作成">
@@ -121,7 +121,7 @@ export default function GuidePage() {
         </GuideStep>
 
         <GuideStep no={6} icon={Bell} title="在庫アラートを受け取る">
-          <b>安全在庫を下回った副資材</b>は毎日の定期チェックで検出し、設定した通知先へメール通知します。ダッシュボードや在庫台帳の「安全在庫割れ」でも確認できます。
+          <b>安全在庫を下回った副資材</b>は毎日の定期チェックで検出し、メールで通知します。ダッシュボードや在庫台帳の「安全在庫割れ」でも確認できます。
         </GuideStep>
       </div>
 
