@@ -19,12 +19,6 @@ export async function POST() {
   if (!user?.companyId || !user?.id) {
     return NextResponse.json({ message: "ログインが必要です。" }, { status: 401 });
   }
-  if (user.isDemo) {
-    return NextResponse.json(
-      { message: "デモ利用中はアカウント削除は不要です（デモデータは自動的に削除されます）。" },
-      { status: 400 }
-    );
-  }
 
   try {
     await ensureSchema();
