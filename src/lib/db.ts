@@ -1854,12 +1854,6 @@ export async function getAllowNegative(companyId: string): Promise<boolean> {
   return (await getCompanySettings(companyId)).allowNegative;
 }
 
-export async function updateNotifyEmails(companyId: string, emails: string): Promise<void> {
-  await ensureSchema();
-  const sql = getSql();
-  await sql`UPDATE companies SET notify_emails = ${emails || null} WHERE id = ${companyId}`;
-}
-
 export async function updateAllowNegative(companyId: string, allow: boolean): Promise<void> {
   await ensureSchema();
   const sql = getSql();

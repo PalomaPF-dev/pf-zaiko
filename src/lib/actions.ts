@@ -44,7 +44,6 @@ import {
   updateStocktakeStatus,
   applyStocktake,
   getAllowNegative,
-  updateNotifyEmails,
   updateAllowNegative,
   nextOrderNo,
   createIssueOrder,
@@ -788,11 +787,8 @@ export async function deletePartnerAction(id: string): Promise<void> {
 
 // ===== 設定 =====
 
-export async function updateNotifyEmailsAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireAdminSession();
-  await updateNotifyEmails(companyId, str(fd, "emails"));
-  revalidatePath("/settings");
-}
+// 在庫アラートの通知先はアプリ内で設定しない（アカウント・宛先はポータルが正）。
+// 送信側 resolveNotifyRecipients は既存値があればそれを、無ければ登録ユーザー全員を宛先にする。
 
 export async function updateAllowNegativeAction(fd: FormData): Promise<void> {
   const { companyId } = await requireAdminSession();
