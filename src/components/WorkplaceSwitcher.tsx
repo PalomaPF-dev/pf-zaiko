@@ -19,7 +19,7 @@ interface SiteOption {
  *
  * 選択肢は工場ごとにグループ表示し、職場が未登録の工場も「（職場未登録）」として見せる。
  * 「全工場から選べます」なのに1工場しか出ないとき、他工場の職場が未登録なことが
- * セレクタだけで分かるようにするため（登録はマスタ設定 → 工場・職場）。
+ * セレクタだけで分かるようにするため（工場・職場の登録はポータルの部署設定で行う）。
  */
 export default function WorkplaceSwitcher({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
@@ -39,7 +39,7 @@ export default function WorkplaceSwitcher({ compact = false }: { compact?: boole
         setWps(d.workplaces ?? []);
         setSites(d.sites ?? []);
         setCurrent(d.currentId ?? "");
-        // 工場スコープの有無（null＝管理者・工場未設定＝全工場から選べる）
+        // 工場スコープの有無（null＝工場未所属＝全工場から選べる）
         setScoped(Boolean(d.scope));
         setLoaded(true);
       })
@@ -74,7 +74,7 @@ export default function WorkplaceSwitcher({ compact = false }: { compact?: boole
 
   return (
     <>
-    {/* サイドバーでは見出しを出す。工場スコープが無い人（管理者・工場未設定）は
+    {/* サイドバーでは見出しを出す。工場スコープが無い人（工場未所属）は
         全工場から選べるため、所属工場の指定と誤解されないよう明記する。 */}
     {!compact && (
       <div className="mb-1 px-0.5 text-[10px] leading-snug text-[#909090]">
@@ -116,12 +116,13 @@ export default function WorkplaceSwitcher({ compact = false }: { compact?: boole
         <ChevronDown className="pointer-events-none absolute right-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fuchsia-500" />
       </div>
     </div>
-    {/* 職場未登録の工場があるときの案内（サイドバーのみ）。登録すればセレクタに現れる。 */}
+    {/* 職場未登録の工場があるときの案内（サイドバーのみ）。ポータルで登録すれば連動されセレクタに現れる。 */}
     {!compact && emptySites.length > 0 && (
       <p className="mt-1 px-0.5 text-[10px] leading-snug text-[#909090]">
-        {emptySites.map((s) => s.name).join("・")}は職場が未登録のため選べません。
+        {emptySites.map((s) => s.name).join("・")}は職場が未登録のため選べません
+        （職場はポータルの部署設定で登録します）。
         <Link href="/sites" className="ml-0.5 font-medium text-fuchsia-600 hover:underline">
-          工場・職場で登録 →
+          工場・職場を確認 →
         </Link>
       </p>
     )}

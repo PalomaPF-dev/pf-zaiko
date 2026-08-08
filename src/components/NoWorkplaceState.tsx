@@ -6,8 +6,8 @@ const PORTAL_ADMIN_URL = "https://portal.paloma-pf.com/admin.html";
 
 /**
  * 現在の職場が決まらないときの案内。
- * 通常は「工場・職場が未連動」だが、部署（工場）スコープが効いているユーザーの場合は
- * 自工場の職場が無い（または所属工場名が工場マスタに無い）ことを伝える。
+ * 工場所属のユーザー（管理者含む）には自工場の職場が無い（または所属工場名が
+ * 工場マスタに無い）ことを、工場未所属のユーザーには全体が未連動なことを伝える。
  * 工場・職場はポータルの部署設定が正で、このアプリでは登録・編集できない（ポータルから連動される）。
  */
 export default async function NoWorkplaceState() {
@@ -21,8 +21,8 @@ export default async function NoWorkplaceState() {
         </p>
         <p className="text-xs text-slate-400">
           {scope.siteId
-            ? `${scope.factory}に職場が登録されていません。管理者に登録を依頼してください。`
-            : `${scope.factory}が工場マスタに登録されていません。管理者に登録を依頼してください。`}
+            ? `${scope.factory}に職場が連動されていません。ポータルの部署設定で職場を登録すると、この在庫管理へ連動されます。`
+            : `${scope.factory}が工場マスタに連動されていません。ポータルの部署設定（部署種別「工場」）をご確認ください。`}
         </p>
       </div>
     );

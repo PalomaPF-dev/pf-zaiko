@@ -11,13 +11,13 @@ import {
 
 /**
  * 部署（工場）スコープ。ポータルの部署が「工場」種別のとき users.factory に工場名が入る。
- * スコープは**閲覧用**と**入出庫用**の2本立てになっている。
+ * スコープは**閲覧用**と**入出庫用**の2本立てになっている。どちらも**役割では緩まない**。
  *
- * - 閲覧スコープ（currentSiteScope）… 一般（member）・作業者（worker）は所属工場のデータだけ。
- *   管理者（admin）と工場未設定は制限なし（＝全工場を閲覧できる）。
- * - 入出庫スコープ（currentOpSiteScope）… 役割では緩まない。工場に所属している人は
- *   **管理者であっても自分の工場でしか入出庫できない**。工場に所属していない人
- *   （ポータル管理者など部署が工場でない）だけが全工場で入出庫できる。
+ * - 閲覧スコープ（currentSiteScope）… 工場に所属している人は**管理者であっても**
+ *   所属工場のデータだけを閲覧できる。工場に所属していない人
+ *   （ポータル管理者など部署が工場でない＝factory 未設定）だけが全工場を閲覧できる。
+ * - 入出庫スコープ（currentOpSiteScope）… 同じく工場基準。工場に所属している人は
+ *   自分の工場でしか入出庫できず、工場に所属していない人だけが全工場で入出庫できる。
  *
  * このアプリの拠点マスタは 工場 sites → 職場 workplaces → 置き場 locations → 在庫 という階層なので、
  * ポータルの工場名を sites.name と突合して site_id を解決し、その配下だけを見せる／書かせる。
@@ -44,8 +44,9 @@ export function outOfOperationScopeMessage(factory: string): string {
 const NO_SITE_ID = "00000000-0000-0000-0000-000000000000";
 
 /**
- * ログイン中ユーザーの**閲覧**工場スコープ。null＝制限なし（管理者・工場未設定・未ログイン）。
- * role/factory は DB から都度取得するため、ポータルでの変更が既存セッションにも即時反映される。
+ * ログイン中ユーザーの**閲覧**工場スコープ。null＝制限なし（工場未所属・未ログイン）。
+ * 工場所属者は管理者でも非 null（＝自工場のみ）。
+ * factory は DB から都度取得するため、ポータルでの変更が既存セッションにも即時反映される。
  * 同一リクエスト内では React cache で1回だけ解決する。
  */
 export const currentSiteScope = cache(async (): Promise<SiteScope | null> => {
@@ -57,7 +58,7 @@ export const currentSiteScope = cache(async (): Promise<SiteScope | null> => {
 
 /**
  * ログイン中ユーザーの**入出庫**工場スコープ。null＝全工場で入出庫可（工場未所属のみ）。
- * 管理者でも所属工場があれば非 null になる点が閲覧スコープとの違い。
+ * 判定基準は閲覧スコープと同じ工場基準（現状は同値。書き込み系は必ずこちらを使う）。
  */
 export const currentOpSiteScope = cache(async (): Promise<SiteScope | null> => {
   const s = await getScopedSession();
