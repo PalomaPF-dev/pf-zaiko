@@ -60,15 +60,17 @@ import {
   addReceiptLine,
   deleteReceiptLine,
   putawayProduct,
+  bulkCreateProductsFromAllItems,
   bulkCreateProductsFromItems,
   bulkDeleteProducts,
+  bulkSetProductCategory,
   getItemMastersByCodes,
   setItemMasterHidden,
   type ProductInput,
   type PartnerInput,
 } from "./db";
 import { reimportItemMaster } from "./itemMasterSeed";
-import { itemUnitForProduct, normalizeItemCode } from "./itemCode";
+import { ITEM_UNIT_LABELS, itemUnitForProduct, normalizeItemCode } from "./itemCode";
 import { IO_TX_TYPES, PARTNER_KIND_LABEL, type TxType, type PartnerKind } from "./types";
 
 // ===== FormData ヘルパー =====
@@ -226,6 +228,22 @@ export async function bulkDeleteProductsAction(fd: FormData): Promise<void> {
   redirect(`/products?deleted=${deleted}&selected=${ids.length}`);
 }
 
+/**
+ * 選択した品目の分類をまとめて設定する（管理者のみ）。空欄で実行すると未分類に戻す。
+ * カタログから一括登録した品目の分類分けを、一覧上で完結させるためのアクション。
+ */
+export async function bulkSetCategoryAction(fd: FormData): Promise<void> {
+  const { companyId } = await requireAdminSession();
+  const ids = Array.from(
+    new Set(fd.getAll("ids").map(String).filter((v) => UUID_INPUT_RE.test(v)))
+  );
+  if (ids.length === 0) redirect("/products");
+  const category = strOrNull(fd, "category");
+  const n = await bulkSetProductCategory(companyId, ids, category);
+  revalidatePath("/products");
+  redirect(`/products?categorized=${n}${category ? `&cat=${encodeURIComponent(category)}` : ""}`);
+}
+
 // ===== 資材W/F 品目カタログ =====
 
 /** 同梱の品目カタログを取り込み直す（版が同じでも上書き）。管理者のみ。 */
@@ -269,6 +287,19 @@ export async function bulkRegisterItemsAction(fd: FormData): Promise<void> {
   revalidatePath("/items");
   revalidatePath("/products");
   redirect(`/items?registered=${created}&selected=${codes.length}`);
+}
+
+/**
+ * カタログの未登録品目（削除済みを除く）を全件まとめて品目マスタへ登録する（管理者のみ）。
+ * 不要品目をカタログから削除し終えたあとの初期展開用。件数上限は設けない
+ * （1つの INSERT で完結し、登録済みは自動スキップされるため）。
+ */
+export async function bulkRegisterAllItemsAction(): Promise<void> {
+  const { companyId } = await requireAdminSession();
+  const created = await bulkCreateProductsFromAllItems(companyId, ITEM_UNIT_LABELS);
+  revalidatePath("/items");
+  revalidatePath("/products");
+  redirect(`/items?registered=${created}`);
 }
 
 /** FormData の codes[] を正規化して重複排除。 */

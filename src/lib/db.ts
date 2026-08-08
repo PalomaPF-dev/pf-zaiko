@@ -453,10 +453,18 @@ export interface ProductInput {
   active: boolean;
 }
 
-/** 品目一覧（現在庫合計・在庫ロケ数つき）。検索語（図番/品名/規格/分類/メーカー）で絞り込み。 */
+/** 品目一覧（現在庫合計・在庫ロケ数つき）。検索語（図番/品名/規格/分類/メーカー）・分類で絞り込み。 */
 export async function listProducts(
   companyId: string,
-  opts: { search?: string | null; activeOnly?: boolean; belowSafetyOnly?: boolean } = {}
+  opts: {
+    search?: string | null;
+    activeOnly?: boolean;
+    belowSafetyOnly?: boolean;
+    /** 分類の完全一致で絞る（null/未指定は全分類） */
+    category?: string | null;
+    /** 分類が未設定の品目だけに絞る */
+    uncategorizedOnly?: boolean;
+  } = {}
 ): Promise<ProductWithStock[]> {
   await ensureSchema();
   const sql = getSql();
@@ -472,6 +480,8 @@ export async function listProducts(
     ) s ON s.product_id = p.id
     WHERE p.company_id = ${companyId}
       AND (${opts.activeOnly ? true : null}::boolean IS NULL OR p.active = true)
+      AND (${opts.category ?? null}::text IS NULL OR p.category = ${opts.category ?? null})
+      AND (${opts.uncategorizedOnly ? true : null}::boolean IS NULL OR p.category IS NULL OR p.category = '')
       AND (${like}::text IS NULL
            OR p.drawing_no ILIKE ${like} OR p.product_code ILIKE ${like} OR p.stock_key ILIKE ${like}
            OR p.maker_code ILIKE ${like}
@@ -558,6 +568,65 @@ export async function deleteProduct(companyId: string, id: string): Promise<void
   await ensureSchema();
   const sql = getSql();
   await sql`DELETE FROM products WHERE company_id = ${companyId} AND id = ${id}`;
+}
+
+/**
+ * カタログの未登録品目（削除済みを除く）を、**全件まとめて**品目マスタへ登録する。
+ * 「W/F上の不要品目をカタログから削除し終えたら、残りを一括で品目マスタ化する」運用向け。
+ * 1つの INSERT ... SELECT で完結する（ZK連番の通し採番・登録済みスキップは選択式と同じ）。
+ * 単位は unitLabels（W/F単位コード→単位名）で解決できたものだけ引き継ぎ、不明は「個」。
+ * @returns 登録した件数
+ */
+export async function bulkCreateProductsFromAllItems(
+  companyId: string,
+  unitLabels: Record<string, string>
+): Promise<number> {
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    WITH base AS (
+      SELECT COALESCE(MAX(NULLIF(regexp_replace(stock_key, '[^0-9]', '', 'g'), '')::bigint), 0) AS n
+      FROM products WHERE company_id = ${companyId} AND stock_key LIKE 'ZK%'
+    ), src AS (
+      SELECT i.code, i.name, i.supplier_name, i.lot_qty, i.unit_code,
+             row_number() OVER (ORDER BY i.code) AS rn
+      FROM item_master i
+      WHERE i.company_id = ${companyId} AND NOT i.hidden
+        AND NOT EXISTS (
+          SELECT 1 FROM products p WHERE p.company_id = ${companyId} AND p.drawing_no = i.code)
+    )
+    INSERT INTO products (company_id, drawing_no, name, unit, lot_size, supplier, stock_key, active)
+    SELECT ${companyId}, src.code, src.name,
+           COALESCE(${JSON.stringify(unitLabels)}::jsonb ->> src.unit_code, '個'),
+           CASE WHEN src.lot_qty = trunc(src.lot_qty) AND src.lot_qty BETWEEN 1 AND 2147483647
+                THEN src.lot_qty::int END,
+           src.supplier_name,
+           'ZK' || lpad((base.n + src.rn)::text, 8, '0'),
+           true
+    FROM src CROSS JOIN base
+    ON CONFLICT DO NOTHING
+    RETURNING id`;
+  return rows.length;
+}
+
+/**
+ * 選択した品目の分類をまとめて設定する（category=null で未分類に戻す）。
+ * カタログから一括登録した品目には分類が付いていないため、後からまとめて分類分けする用。
+ * @returns 更新した件数
+ */
+export async function bulkSetProductCategory(
+  companyId: string,
+  ids: string[],
+  category: string | null
+): Promise<number> {
+  await ensureSchema();
+  if (ids.length === 0) return 0;
+  const sql = getSql();
+  const rows = await sql`
+    UPDATE products SET category = ${category}, updated_at = NOW()
+    WHERE company_id = ${companyId} AND id = ANY(${ids}::uuid[])
+    RETURNING id`;
+  return rows.length;
 }
 
 /**
