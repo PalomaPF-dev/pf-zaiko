@@ -88,9 +88,9 @@ export default async function RecordsPage({
 
       <form className="mb-4 flex flex-wrap items-end gap-2">
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-500">商品</label>
+          <label className="mb-1 block text-xs font-medium text-slate-500">品目</label>
           <select name="product" defaultValue={sp.product ?? ""} className={inputCls}>
-            <option value="">すべての商品</option>
+            <option value="">すべての品目</option>
             {products.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.makerCode ?? p.drawingNo} {p.name}

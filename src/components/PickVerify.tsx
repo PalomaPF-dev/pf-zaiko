@@ -10,7 +10,7 @@ import InventoryQrScanner from "@/components/InventoryQrScanner";
  * 3点照合出庫（誤出荷防止）。
  * 3つのQRを読み取って照合する：
  *  ① 指示リストのQR（＝在庫管理キー。印刷した出庫指示リスト）
- *  ② 商品ラベルのQR（＝在庫管理キー。現物のラベル）
+ *  ② 品目ラベルのQR（＝在庫管理キー。現物のラベル）
  *  ③ ロケーションラベルのQR（＝ロケ番号。指定の棚）
  * ①②が明細の在庫管理キーと一致し、③が引当ロケと一致したときだけ出荷（出庫確定）できる。
  */
@@ -28,7 +28,7 @@ export default function PickVerify({
   orderId: string;
   lineId: string;
   expectedLocationCode: string | null;
-  productCodes: string[]; // 在庫管理キー/商品CD/図番 のいずれか一致でOK（主は在庫管理キー）
+  productCodes: string[]; // 在庫管理キー/品目CD/図番 のいずれか一致でOK（主は在庫管理キー）
   productName: string;
   qtyInstructed: number;
   unit: string;
@@ -81,20 +81,20 @@ export default function PickVerify({
     return false;
   }
 
-  // 商品ラベルQR（現物・在庫管理キー）
+  // 品目ラベルQR（現物・在庫管理キー）
   function checkProduct(raw: string): boolean {
     const code = raw.trim().toUpperCase();
     if (!code) return false;
     if (codes.includes(code)) {
       setProdOk(true);
-      setMsg({ kind: "ok", text: `商品ラベル照合OK：${productName}` });
+      setMsg({ kind: "ok", text: `品目ラベル照合OK：${productName}` });
       return true;
     }
-    setMsg({ kind: "err", text: `⚠ 誤出荷防止：商品が一致しません（読取 ${code}）` });
+    setMsg({ kind: "err", text: `⚠ 誤出荷防止：品目が一致しません（読取 ${code}）` });
     return false;
   }
 
-  // 単一スキャナ：ロケ→（在庫管理キーは 指示→商品 の順で自動充填）
+  // 単一スキャナ：ロケ→（在庫管理キーは 指示→品目 の順で自動充填）
   function route(raw: string) {
     const t = raw.trim();
     if (!t) return;
@@ -103,7 +103,7 @@ export default function PickVerify({
       checkLocation(r.code);
       return;
     }
-    // 在庫管理キー：まだの指示、次に商品へ順に充填
+    // 在庫管理キー：まだの指示、次に品目へ順に充填
     if (!instrOk) checkInstr(t);
     else checkProduct(t);
   }
@@ -146,13 +146,13 @@ export default function PickVerify({
       <div className="mb-2 rounded-lg bg-slate-50 p-2 text-[11px] text-slate-600">
         ロケ <b className="font-mono">{expectedLocationCode ?? "未引当"}</b> ／ {productName} を {qtyInstructed}
         {unit}
-        <div className="mt-0.5 text-slate-400">① 指示リスト ② 商品ラベル（現物） ③ ロケ（棚）の3QRを読み取り</div>
+        <div className="mt-0.5 text-slate-400">① 指示リスト ② 品目ラベル（現物） ③ ロケ（棚）の3QRを読み取り</div>
       </div>
 
-      {/* 照合状態（指示・商品・ロケ） */}
+      {/* 照合状態（指示・品目・ロケ） */}
       <div className="mb-2 flex gap-1.5">
         <StatusPill label="① 指示" ok={instrOk} />
-        <StatusPill label="② 商品" ok={prodOk} />
+        <StatusPill label="② 品目" ok={prodOk} />
         <StatusPill label="③ ロケ" ok={locOk} />
       </div>
 
@@ -176,7 +176,7 @@ export default function PickVerify({
 
       {/* 手入力（QRが読めない時） */}
       <ManualRow value={instrInput} onChange={setInstrInput} onCheck={() => checkInstr(instrInput)} placeholder="① 指示リスト（在庫管理キー）" />
-      <ManualRow value={prodInput} onChange={setProdInput} onCheck={() => checkProduct(prodInput)} placeholder="② 商品ラベル（在庫管理キー）" />
+      <ManualRow value={prodInput} onChange={setProdInput} onCheck={() => checkProduct(prodInput)} placeholder="② 品目ラベル（在庫管理キー）" />
       <ManualRow value={locInput} onChange={setLocInput} onCheck={() => checkLocation(locInput)} placeholder="③ ロケ番号" />
 
       {msg && (
@@ -193,7 +193,7 @@ export default function PickVerify({
           className="flex w-full items-center justify-center gap-1 rounded-lg bg-fuchsia-600 py-1.5 text-xs font-semibold text-white hover:bg-fuchsia-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Truck className="h-3.5 w-3.5" />
-          {pending ? "出庫中…" : allOk ? "出荷可能・出庫を確定" : "指示・商品・ロケを照合してください"}
+          {pending ? "出庫中…" : allOk ? "出荷可能・出庫を確定" : "指示・品目・ロケを照合してください"}
         </button>
       </form>
       {state && !state.ok && <p className="mt-1 text-[11px] text-red-600">{state.message}</p>}

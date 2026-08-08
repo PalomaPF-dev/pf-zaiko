@@ -30,9 +30,9 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700"
       >
         <ArrowLeft className="h-4 w-4" />
-        商品詳細に戻る
+        品目詳細に戻る
       </Link>
-      <PageHeader title="商品情報を編集" description={`${product.drawingNo} ${product.name}`} />
+      <PageHeader title="品目情報を編集" description={`${product.drawingNo} ${product.name}`} />
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5">
         <ProductForm
@@ -45,9 +45,9 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
       </div>
 
       <div className="mt-6 rounded-2xl border border-red-200 bg-red-50/50 p-5">
-        <h2 className="mb-1 text-sm font-bold text-red-700">商品を削除</h2>
+        <h2 className="mb-1 text-sm font-bold text-red-700">品目を削除</h2>
         <p className="mb-3 text-xs text-red-600/80">
-          この商品の在庫・受払履歴もすべて削除されます。この操作は取り消せません。
+          この品目の在庫・受払履歴もすべて削除されます。この操作は取り消せません。
         </p>
         <ConfirmForm
           action={del}

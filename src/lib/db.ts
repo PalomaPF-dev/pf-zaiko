@@ -30,6 +30,9 @@ import type {
   ReceiptLineWithMeta,
   ReceiptStatus,
   PendingPutaway,
+  ItemMaster,
+  ItemMasterWithProduct,
+  ItemMasterImport,
 } from "./types";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -338,7 +341,7 @@ export async function ensureDefaultLocation(
   return back[0]?.id ?? id;
 }
 
-// ===== 商品マスタ =====
+// ===== 品目マスタ =====
 
 export interface ProductInput {
   drawingNo: string;
@@ -357,7 +360,7 @@ export interface ProductInput {
   active: boolean;
 }
 
-/** 商品一覧（現在庫合計・在庫ロケ数つき）。検索語（図番/品名/規格/分類/メーカー）で絞り込み。 */
+/** 品目一覧（現在庫合計・在庫ロケ数つき）。検索語（図番/品名/規格/分類/メーカー）で絞り込み。 */
 export async function listProducts(
   companyId: string,
   opts: { search?: string | null; activeOnly?: boolean; belowSafetyOnly?: boolean } = {}
@@ -393,7 +396,7 @@ export async function getProduct(companyId: string, id: string): Promise<Product
   return rows[0] ? mapProduct(rows[0]) : null;
 }
 
-/** 図番で商品を引く（QR/スキャン/手入力の解決用）。 */
+/** 図番で品目を引く（QR/スキャン/手入力の解決用）。 */
 export async function getProductByDrawingNo(companyId: string, drawingNo: string): Promise<Product | null> {
   await ensureSchema();
   const sql = getSql();
@@ -404,7 +407,7 @@ export async function getProductByDrawingNo(companyId: string, drawingNo: string
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** 任意コード（図番/商品CD/在庫管理キー）で商品を解決。 */
+/** 任意コード（図番/品目CD/在庫管理キー）で品目を解決。 */
 export async function getProductByAnyCode(companyId: string, code: string): Promise<Product | null> {
   await ensureSchema();
   const sql = getSql();
@@ -417,7 +420,7 @@ export async function getProductByAnyCode(companyId: string, code: string): Prom
   return rows[0] ? mapProduct(rows[0]) : null;
 }
 
-/** UUID なら id、そうでなければ図番/商品CD/在庫管理キーで解決（一覧リンクと QR の両対応）。 */
+/** UUID なら id、そうでなければ図番/品目CD/在庫管理キーで解決（一覧リンクと QR の両対応）。 */
 export async function resolveProduct(companyId: string, idOrCode: string): Promise<Product | null> {
   return UUID_RE.test(idOrCode)
     ? getProduct(companyId, idOrCode)
@@ -473,6 +476,167 @@ export async function listCategories(companyId: string): Promise<string[]> {
     WHERE company_id = ${companyId} AND category IS NOT NULL AND category <> ''
     ORDER BY category`;
   return rows.map((r: any) => r.category as string);
+}
+
+// ===== 資材W/F 品目カタログ（参照専用。在庫は持たない） =====
+
+function mapItemMaster(r: any): ItemMaster {
+  return {
+    code: r.code,
+    name: r.name,
+    supplierCode: r.supplier_code,
+    supplierName: r.supplier_name,
+    altSuppliers: r.alt_suppliers,
+    unitCode: r.unit_code,
+    packQty: numOrNull(r.pack_qty),
+    packUnitCode: r.pack_unit_code,
+    lotQty: numOrNull(r.lot_qty),
+    roundQty: numOrNull(r.round_qty),
+    container: r.container,
+    accountCode: r.account_code,
+    unitPrice: numOrNull(r.unit_price),
+    validFrom: r.valid_from,
+    validTo: r.valid_to,
+    active: Boolean(r.active),
+  };
+}
+
+function mapItemMasterWithProduct(r: any): ItemMasterWithProduct {
+  return { ...mapItemMaster(r), productId: r.product_id ?? null };
+}
+
+export interface ItemMasterFilter {
+  search?: string | null;
+  activeOnly?: boolean;
+  /** 品目マスタに未登録の品目だけに絞る */
+  unregisteredOnly?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * 品目カタログ一覧（品目コード／品名／仕入先で検索）。品目マスタに登録済みかも合わせて返す。
+ * ページ送り用の総件数はウィンドウ関数で同時に取る（同じ条件式を2回書かないため）。
+ */
+export async function listItemMaster(
+  companyId: string,
+  filter: ItemMasterFilter = {}
+): Promise<{ items: ItemMasterWithProduct[]; total: number }> {
+  await ensureSchema();
+  const sql = getSql();
+  // 「06-26105-00」のようなハイフン付きで検索されても拾えるよう、数字だけを抜いた形でもコードを見る
+  const raw = filter.search?.trim() || null;
+  const digits = raw ? raw.replace(/[^0-9]/g, "") : "";
+  const like = raw ? `%${raw}%` : null;
+  const codeLike = digits ? `%${digits}%` : null;
+  const limit = filter.limit ?? 100;
+  const rows = await sql`
+    SELECT i.*, p.id AS product_id, (COUNT(*) OVER ())::int AS total_count
+    FROM item_master i
+    LEFT JOIN products p ON p.company_id = i.company_id AND p.drawing_no = i.code
+    WHERE i.company_id = ${companyId}
+      AND (${filter.activeOnly ? true : null}::boolean IS NULL OR i.active = true)
+      AND (${filter.unregisteredOnly ? true : null}::boolean IS NULL OR p.id IS NULL)
+      AND (${like}::text IS NULL
+           OR i.name ILIKE ${like} OR i.supplier_name ILIKE ${like} OR i.alt_suppliers ILIKE ${like}
+           OR (${codeLike}::text IS NOT NULL AND i.code LIKE ${codeLike}))
+    ORDER BY i.code
+    LIMIT ${limit} OFFSET ${filter.offset ?? 0}`;
+  return {
+    items: rows.map(mapItemMasterWithProduct),
+    total: rows[0] ? Number(rows[0].total_count) : 0,
+  };
+}
+
+/** 品目コード（9桁）で1件引く。品目マスタに登録済みならその ID も返す。 */
+export async function getItemMasterByCode(
+  companyId: string,
+  code: string
+): Promise<ItemMasterWithProduct | null> {
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT i.*, p.id AS product_id
+    FROM item_master i
+    LEFT JOIN products p ON p.company_id = i.company_id AND p.drawing_no = i.code
+    WHERE i.company_id = ${companyId} AND i.code = ${code}
+    LIMIT 1`;
+  return rows[0] ? mapItemMasterWithProduct(rows[0]) : null;
+}
+
+/** 品目コードの配列でカタログを引く（一括登録の対象確認用）。存在しないコードは結果に出ない。 */
+export async function getItemMastersByCodes(companyId: string, codes: string[]): Promise<ItemMaster[]> {
+  await ensureSchema();
+  if (codes.length === 0) return [];
+  const sql = getSql();
+  const rows = await sql`
+    SELECT * FROM item_master
+    WHERE company_id = ${companyId} AND code = ANY(${codes})
+    ORDER BY code`;
+  return rows.map(mapItemMaster);
+}
+
+/** 一括登録の1件（単位はカタログの単位コードから解決済み。未解決なら null＝既定の「個」） */
+export interface ItemToRegister {
+  code: string;
+  unit: string | null;
+}
+
+/**
+ * 資材W/F 品目カタログの指定コードを、品目マスタ（products）へ一括登録する。
+ *
+ * - 既に登録済み（products.drawing_no が同じコード）の品目は黙って飛ばす（何度押しても増えない）。
+ * - 在庫管理キー（ZK＋8桁連番）は既存の最大値から通しで採番する。1文で完結させるので、
+ *   件数分の往復も、採番の取り合いも起きない。
+ * - ロットサイズは products 側が INTEGER なので、整数のロット数だけ引き継ぐ。
+ *
+ * @returns 実際に登録した件数
+ */
+export async function bulkCreateProductsFromItems(
+  companyId: string,
+  entries: ItemToRegister[]
+): Promise<number> {
+  await ensureSchema();
+  if (entries.length === 0) return 0;
+  const sql = getSql();
+  const rows = await sql`
+    WITH input AS (
+      SELECT * FROM jsonb_to_recordset(${JSON.stringify(entries)}::jsonb) AS x(code TEXT, unit TEXT)
+    ), base AS (
+      SELECT COALESCE(MAX(NULLIF(regexp_replace(stock_key, '[^0-9]', '', 'g'), '')::bigint), 0) AS n
+      FROM products WHERE company_id = ${companyId} AND stock_key LIKE 'ZK%'
+    ), src AS (
+      SELECT i.code, i.name, i.supplier_name, i.lot_qty,
+             COALESCE(NULLIF(input.unit, ''), '個') AS unit,
+             row_number() OVER (ORDER BY i.code) AS rn
+      FROM input
+      JOIN item_master i ON i.company_id = ${companyId} AND i.code = input.code
+      WHERE NOT EXISTS (
+        SELECT 1 FROM products p WHERE p.company_id = ${companyId} AND p.drawing_no = i.code)
+    )
+    INSERT INTO products (company_id, drawing_no, name, unit, lot_size, supplier, stock_key, active)
+    SELECT ${companyId}, src.code, src.name, src.unit,
+           CASE WHEN src.lot_qty = trunc(src.lot_qty) AND src.lot_qty BETWEEN 1 AND 2147483647
+                THEN src.lot_qty::int END,
+           src.supplier_name,
+           'ZK' || lpad((base.n + src.rn)::text, 8, '0'),
+           true
+    FROM src CROSS JOIN base
+    ON CONFLICT DO NOTHING
+    RETURNING id`;
+  return rows.length;
+}
+
+/** 品目カタログの取込状況（未取込なら null）。 */
+export async function getItemMasterImport(companyId: string): Promise<ItemMasterImport | null> {
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT version, item_count, imported_at FROM item_master_imports WHERE company_id = ${companyId} LIMIT 1`;
+  const r = rows[0];
+  return r
+    ? { version: r.version, itemCount: Number(r.item_count), importedAt: tsStr(r.imported_at) }
+    : null;
 }
 
 // ===== ロケーション =====
@@ -660,7 +824,7 @@ export interface StockFilter {
   limit?: number;
 }
 
-/** 在庫台帳（商品×ロケの現在庫、商品・ロケ情報つき）。 */
+/** 在庫台帳（品目×ロケの現在庫、品目・ロケ情報つき）。 */
 export async function listStock(companyId: string, filter: StockFilter = {}): Promise<StockWithMeta[]> {
   await ensureSchema();
   const sql = getSql();
@@ -684,11 +848,11 @@ export async function listStock(companyId: string, filter: StockFilter = {}): Pr
     LIMIT ${limit}`;
   const mapped = rows.map(mapStockWithMeta);
   if (!filter.belowSafetyOnly) return mapped;
-  // 商品合計と安全在庫の比較は listProducts 側で行うため、ここでは行単位のフィルタは不要
+  // 品目合計と安全在庫の比較は listProducts 側で行うため、ここでは行単位のフィルタは不要
   return mapped;
 }
 
-/** 特定商品のロケ別在庫（商品詳細用）。siteId 指定時はその工場の置き場だけ。 */
+/** 特定品目のロケ別在庫（品目詳細用）。siteId 指定時はその工場の置き場だけ。 */
 export async function listStockForProduct(
   companyId: string,
   productId: string,
@@ -702,7 +866,7 @@ export async function listStockForLocation(companyId: string, locationId: string
   return listStock(companyId, { locationId, nonZeroOnly: true });
 }
 
-/** 商品×ロケの現在庫セル（無ければ null）。 */
+/** 品目×ロケの現在庫セル（無ければ null）。 */
 export async function getStockCell(
   companyId: string,
   productId: string,
@@ -865,7 +1029,7 @@ export interface TxFilter {
   limit?: number;
 }
 
-/** 受払照会（時系列・新しい順、商品/ロケ/区分/期間フィルタ）。 */
+/** 受払照会（時系列・新しい順、品目/ロケ/区分/期間フィルタ）。 */
 export async function listTransactions(companyId: string, filter: TxFilter = {}): Promise<TransactionWithMeta[]> {
   await ensureSchema();
   const sql = getSql();
@@ -890,7 +1054,7 @@ export async function listTransactions(companyId: string, filter: TxFilter = {})
   return rows.map(mapTxWithMeta);
 }
 
-/** 受払1件を商品・ロケ情報つきで取得（入荷現品票の再発行用）。siteId 指定時はその工場の受払だけ。 */
+/** 受払1件を品目・ロケ情報つきで取得（入荷現品票の再発行用）。siteId 指定時はその工場の受払だけ。 */
 export async function getTransaction(
   companyId: string,
   id: string,
@@ -1110,7 +1274,7 @@ export async function dashboardCounts(companyId: string): Promise<DashboardCount
   };
 }
 
-/** 安全在庫割れの商品（合計在庫 < safety_stock）。 */
+/** 安全在庫割れの品目（合計在庫 < safety_stock）。 */
 export async function listBelowSafety(companyId: string): Promise<ProductWithStock[]> {
   const products = await listProducts(companyId, { activeOnly: true });
   return products.filter((p) => p.belowSafety);
@@ -1186,7 +1350,7 @@ export async function createIssueOrder(companyId: string, input: IssueOrderInput
   return rows[0].id as string;
 }
 
-/** その商品の在庫が最も多いロケを引当（無在庫なら null）。職場指定時はその職場のロケに限定。 */
+/** その品目の在庫が最も多いロケを引当（無在庫なら null）。職場指定時はその職場のロケに限定。 */
 export async function allocateLocationForProduct(
   companyId: string,
   productId: string,
@@ -1549,7 +1713,7 @@ export async function createReceipt(
   return { id: rows[0].id as string, receiptNo };
 }
 
-/** 受入明細を追加（仕入先は商品マスタからスナップショット）。 */
+/** 受入明細を追加（仕入先は品目マスタからスナップショット）。 */
 export async function addReceiptLine(
   companyId: string,
   receiptId: string,
@@ -1669,7 +1833,7 @@ export async function markReceiptLinesLabelPrinted(companyId: string, ids: strin
 }
 
 /**
- * 未入庫（棚入れ待ち）を商品ごとに集計（②入庫の候補一覧）。
+ * 未入庫（棚入れ待ち）を品目ごとに集計（②入庫の候補一覧）。
  * opts.siteId 指定時は、その工場で受け入れた入荷分だけを候補にする（他工場の入荷を棚入れさせない）。
  */
 export async function listPendingPutaway(
@@ -1707,7 +1871,7 @@ export async function listPendingPutaway(
   }));
 }
 
-/** その商品の未入庫数（棚入れ待ちの合計）。 */
+/** その品目の未入庫数（棚入れ待ちの合計）。 */
 export async function getPendingQtyForProduct(companyId: string, productId: string): Promise<number> {
   await ensureSchema();
   const sql = getSql();

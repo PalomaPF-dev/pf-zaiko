@@ -18,7 +18,7 @@ export interface StockAlertPayload {
 }
 
 /**
- * 安全在庫を下回った商品の一覧を管理者へ通知する。
+ * 安全在庫を下回った品目の一覧を管理者へ通知する。
  * RESEND_API_KEY 未設定 or 宛先ゼロなら送信をスキップ（false）。
  */
 export async function sendStockAlert(to: string[], payload: StockAlertPayload): Promise<boolean> {
@@ -40,9 +40,9 @@ export async function sendStockAlert(to: string[], payload: StockAlertPayload): 
   const subject = `【在庫アラート・${payload.lines.length}件】安全在庫割れ - PF在庫管理`;
   const text =
     `${payload.companyName} ご担当者様\n\n` +
-    `安全在庫を下回った商品があります。発注・補充をご検討ください。\n\n` +
+    `安全在庫を下回った品目があります。発注・補充をご検討ください。\n\n` +
     `▼ 在庫台帳（安全在庫割れ）\n${stockUrl}\n\n` +
-    `--- 対象商品 ---\n${lines}\n\n— PF在庫管理（自動送信）`;
+    `--- 対象品目 ---\n${lines}\n\n— PF在庫管理（自動送信）`;
 
   try {
     await resend.emails.send({ from, to, subject, text, ...(replyTo ? { replyTo } : {}) });

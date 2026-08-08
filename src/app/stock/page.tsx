@@ -2,12 +2,13 @@ import Link from "next/link";
 import { Download, Search, Boxes, Factory } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { listStock } from "@/lib/db";
-import { resolveCurrentWorkplace } from "@/lib/workplace";
+import { currentWorkplaceOperation } from "@/lib/workplace";
 import PageHeader from "@/components/PageHeader";
 import { BelowSafetyBadge } from "@/components/Badges";
 import DbErrorState from "@/components/DbErrorState";
 import NoWorkplaceState from "@/components/NoWorkplaceState";
 import StockRowActions from "@/components/StockRowActions";
+import ViewOnlySiteNotice from "@/components/ViewOnlySiteNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +22,9 @@ export default async function StockPage({
   const search = sp.q?.trim() || null;
   const belowOnly = sp.below === "1";
 
-  let workplace, rows;
+  let workplace, operable, rows;
   try {
-    workplace = await resolveCurrentWorkplace(session.companyId);
+    ({ workplace, operable } = await currentWorkplaceOperation(session.companyId));
     if (!workplace) {
       return (
         <div className="p-4 sm:p-6">
@@ -69,6 +70,8 @@ export default async function StockPage({
           </a>
         }
       />
+
+      <ViewOnlySiteNotice companyId={session.companyId} />
 
       {/* 現在の職場 */}
       <div className="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-50 px-3 py-1.5 text-sm font-semibold text-fuchsia-800">
@@ -155,7 +158,7 @@ export default async function StockPage({
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">{r.safetyStock ?? "—"}</td>
                     <td className="px-4 py-2.5">
-                      <StockRowActions />
+                      {operable && <StockRowActions />}
                     </td>
                   </tr>
                 );

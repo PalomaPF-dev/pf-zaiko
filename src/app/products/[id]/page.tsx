@@ -20,7 +20,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   try {
     product = await resolveProduct(companyId, id);
     if (!product) notFound();
-    // 商品マスタは工場共通だが、在庫・受払は自工場の置き場の分だけ表示する
+    // 品目マスタは工場共通だが、在庫・受払は自工場の置き場の分だけ表示する
     const { siteId } = await currentScope();
     [stock, txs] = await Promise.all([
       listStockForProduct(companyId, product.id, siteId),
@@ -30,7 +30,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     console.error("[product detail]", e);
     return (
       <div className="p-4 sm:p-6">
-        <PageHeader title="商品詳細" />
+        <PageHeader title="品目詳細" />
         <DbErrorState />
       </div>
     );

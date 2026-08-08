@@ -24,14 +24,15 @@ let schemaReady: Promise<void> | null = null;
 
 /**
  * 在庫管理のドメインテーブルを冪等に作成。
- * - products         … 商品（図番＝会社内一意。QRラベルの親）
+ * - products         … 品目（図番＝会社内一意。QRラベルの親）
+ * - item_master      … 資材W/F 品目カタログ（参照専用。品目コードで品目マスタへ呼び出す）
  * - loc_areas        … ロケーション階層マスタ（エリア）
  * - loc_counters     … ロケ採番カウンタ（エリア×棚×段の間口採番）
  * - locations        … 実在ロケーション（エリア-棚-段-間口）
- * - stock            … 在庫台帳（商品×ロケ×数量＝現在庫の正）
+ * - stock            … 在庫台帳（品目×ロケ×数量＝現在庫の正）
  * - transactions     … 受払履歴（追記専用の証跡ログ）
  * - stocktakes       … 棚卸（指示）
- * - stocktake_lines  … 棚卸明細（商品×ロケ）
+ * - stocktake_lines  … 棚卸明細（品目×ロケ）
  *
  * 認証テーブル（companies/users）も同時に用意する。
  * 同一プロセス内の同時呼び出しは1回の実行に集約（共有プロミス）。失敗時は次回再試行できるよう解除。
@@ -64,7 +65,7 @@ async function buildSchema(): Promise<void> {
   // 在庫不足時に出庫を許すか（既定 false=拒否）。先行出庫を許す現場のみ ON。
   await safeDdl(() => sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS allow_negative_stock BOOLEAN NOT NULL DEFAULT false`);
 
-  // --- 商品（図番＝会社内一意のマスタ） ---
+  // --- 品目（図番＝会社内一意のマスタ） ---
   await safeDdl(() => sql`
     CREATE TABLE IF NOT EXISTS products (
       id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -84,7 +85,7 @@ async function buildSchema(): Promise<void> {
     )`);
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS products_company_idx ON products(company_id)`);
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS products_company_name_idx ON products(company_id, name)`);
-  // 商品CD（社内の商品コード）・在庫管理キー（ZK+番号。QRの中身）・購入先。図番と併存。
+  // 品目CD（社内コード。資材W/F の品目コードは drawing_no 側）・在庫管理キー（ZK+番号。QRの中身）・購入先。
   await safeDdl(() => sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS product_code TEXT`);
   await safeDdl(() => sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS stock_key TEXT`);
   await safeDdl(() => sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS supplier TEXT`);
@@ -103,6 +104,45 @@ async function buildSchema(): Promise<void> {
   await safeDdl(() => sql`
     CREATE UNIQUE INDEX IF NOT EXISTS products_company_stockkey_unique
     ON products(company_id, stock_key) WHERE stock_key IS NOT NULL`);
+
+  // --- 資材W/F 品目カタログ（参照専用） ---
+  // 品目マスタ（products）とは別物。W/F に登録済みの品目を「品目コードで呼び出す」ための引き当て表で、
+  // 在庫は持たない。ここから登録すると products に1件作られ、以降の入出庫はそちらで動く。
+  await safeDdl(() => sql`
+    CREATE TABLE IF NOT EXISTS item_master (
+      id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      company_id     UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+      code           TEXT NOT NULL,
+      name           TEXT NOT NULL,
+      supplier_code  TEXT,
+      supplier_name  TEXT,
+      alt_suppliers  TEXT,
+      unit_code      TEXT,
+      pack_qty       NUMERIC,
+      pack_unit_code TEXT,
+      lot_qty        NUMERIC,
+      round_qty      NUMERIC,
+      container      TEXT,
+      account_code   TEXT,
+      unit_price     NUMERIC,
+      valid_from     TEXT,
+      valid_to       TEXT,
+      active         BOOLEAN NOT NULL DEFAULT true,
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (company_id, code)
+    )`);
+  await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS item_master_company_name_idx ON item_master(company_id, name)`);
+  await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS item_master_company_supplier_idx ON item_master(company_id, supplier_name)`);
+
+  // 品目カタログの取込履歴（会社ごとに1行）。version = 取込元スナップショットの基準日。
+  // 同梱データの版と一致していれば取込済みとみなし、再取込をスキップする。
+  await safeDdl(() => sql`
+    CREATE TABLE IF NOT EXISTS item_master_imports (
+      company_id  UUID PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+      version     TEXT NOT NULL,
+      item_count  INTEGER NOT NULL DEFAULT 0,
+      imported_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
 
   // ===== 拠点（工場 sites / 職場 workplaces）: 副資材は職場ごとに在庫を独立管理 =====
   // 工場（サイト）
@@ -198,7 +238,7 @@ async function buildSchema(): Promise<void> {
   await safeDdl(() => sql`ALTER TABLE locations ALTER COLUMN level DROP NOT NULL`);
   await safeDdl(() => sql`ALTER TABLE locations ALTER COLUMN bay DROP NOT NULL`);
 
-  // --- 在庫台帳（商品×ロケ×数量 = 現在庫の正） ---
+  // --- 在庫台帳（品目×ロケ×数量 = 現在庫の正） ---
   await safeDdl(() => sql`
     CREATE TABLE IF NOT EXISTS stock (
       id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -271,7 +311,7 @@ async function buildSchema(): Promise<void> {
   await safeDdl(() => sql`ALTER TABLE stocktakes ADD COLUMN IF NOT EXISTS site_id UUID REFERENCES sites(id) ON DELETE SET NULL`);
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS stocktakes_site_idx ON stocktakes(company_id, site_id)`);
 
-  // --- 棚卸明細（商品×ロケ 1行） ---
+  // --- 棚卸明細（品目×ロケ 1行） ---
   await safeDdl(() => sql`
     CREATE TABLE IF NOT EXISTS stocktake_lines (
       id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -309,7 +349,7 @@ async function buildSchema(): Promise<void> {
   await safeDdl(() => sql`ALTER TABLE issue_orders ADD COLUMN IF NOT EXISTS site_id UUID REFERENCES sites(id) ON DELETE SET NULL`);
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS issue_orders_site_idx ON issue_orders(company_id, site_id)`);
 
-  // --- 出庫指示 明細（商品×引当ロケ×数量） ---
+  // --- 出庫指示 明細（品目×引当ロケ×数量） ---
   await safeDdl(() => sql`
     CREATE TABLE IF NOT EXISTS issue_order_lines (
       id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -351,7 +391,7 @@ async function buildSchema(): Promise<void> {
   await safeDdl(() => sql`ALTER TABLE receipts ADD COLUMN IF NOT EXISTS site_id UUID REFERENCES sites(id) ON DELETE SET NULL`);
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS receipts_site_idx ON receipts(company_id, site_id)`);
 
-  // --- 受入明細（商品×受入数。ロケ未定＝未入庫。②入庫で qty_putaway を消し込む） ---
+  // --- 受入明細（品目×受入数。ロケ未定＝未入庫。②入庫で qty_putaway を消し込む） ---
   await safeDdl(() => sql`
     CREATE TABLE IF NOT EXISTS receipt_lines (
       id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -369,7 +409,7 @@ async function buildSchema(): Promise<void> {
       created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS receipt_lines_receipt_idx ON receipt_lines(receipt_id, seq)`);
-  // 未入庫（qty > qty_putaway）を商品ごとに集計する②入庫用の索引
+  // 未入庫（qty > qty_putaway）を品目ごとに集計する②入庫用の索引
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS receipt_lines_pending_idx ON receipt_lines(company_id, product_id) WHERE qty > qty_putaway`);
 
   // 受入伝票の採番カウンタ（会社ごと）

@@ -3,12 +3,13 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Printer, Plus, ArrowRightLeft } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { getReceipt, listReceiptLines, listProducts } from "@/lib/db";
-import { currentScope } from "@/lib/scope";
+import { canOperateReceipt, currentScope } from "@/lib/scope";
 import { addReceiptLineAction } from "@/lib/actions";
 import { formatDate } from "@/lib/format";
 import { RECEIPT_STATUS_LABEL } from "@/lib/types";
 import PageHeader from "@/components/PageHeader";
 import DbErrorState from "@/components/DbErrorState";
+import ViewOnlySiteNotice from "@/components/ViewOnlySiteNotice";
 import ReceivingLineForm, { type ReceivingProduct } from "@/components/ReceivingLineForm";
 import ReceiptLineTable from "@/components/ReceiptLineTable";
 
@@ -21,11 +22,15 @@ export default async function ReceiptDetailPage({ params }: { params: Promise<{ 
   // 他工場の受入伝票は開けない
   const { siteId } = await currentScope();
 
-  let receipt, lines, products;
+  let receipt, lines, products, operable;
   try {
     receipt = await getReceipt(companyId, id, siteId);
     if (!receipt) notFound();
-    [lines, products] = await Promise.all([listReceiptLines(companyId, id), listProducts(companyId, { activeOnly: true })]);
+    [lines, products, operable] = await Promise.all([
+      listReceiptLines(companyId, id),
+      listProducts(companyId, { activeOnly: true }),
+      canOperateReceipt(companyId, id),
+    ]);
   } catch (e) {
     console.error("[receipt detail]", e);
     return (
@@ -36,7 +41,8 @@ export default async function ReceiptDetailPage({ params }: { params: Promise<{ 
     );
   }
 
-  const editable = receipt.status === "open";
+  // 他工場の入荷は閲覧のみ（明細の追加・削除はできない）
+  const editable = receipt.status === "open" && operable;
   const addLine = addReceiptLineAction.bind(null, id);
   const rProducts: ReceivingProduct[] = products.map((p) => ({
     id: p.id,
@@ -86,13 +92,13 @@ export default async function ReceiptDetailPage({ params }: { params: Promise<{ 
         <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4">
           <h2 className="mb-3 flex items-center gap-1.5 text-sm font-bold text-slate-700">
             <Plus className="h-4 w-4" />
-            入荷した商品を登録
+            入荷した品目を登録
           </h2>
           {rProducts.length === 0 ? (
             <p className="text-sm text-slate-500">
               先に{" "}
               <Link href="/products/new" className="text-fuchsia-600 hover:underline">
-                商品マスタ
+                品目マスタ
               </Link>{" "}
               を登録してください。
             </p>
@@ -102,10 +108,12 @@ export default async function ReceiptDetailPage({ params }: { params: Promise<{ 
         </div>
       )}
 
+      {!operable && <ViewOnlySiteNotice companyId={companyId} />}
+
       <ReceiptLineTable receiptId={id} lines={lines} editable={editable} />
 
       <p className="mt-3 text-xs text-slate-400">
-        ※ この段階ではロケーションを設定しません（未入庫）。商品ラベルを貼ったら「入庫（棚入れ）」でラベルをスキャンし、ロケーションを付与します。
+        ※ この段階ではロケーションを設定しません（未入庫）。品目ラベルを貼ったら「入庫（棚入れ）」でラベルをスキャンし、ロケーションを付与します。
       </p>
     </div>
   );

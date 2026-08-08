@@ -1,6 +1,7 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { listWorkplaces, ensureDefaultLocation } from "./db";
-import { currentSiteScope } from "./scope";
+import { currentOpSiteScope, currentSiteScope, outOfOperationScopeMessage } from "./scope";
 import type { WorkplaceWithSite } from "./types";
 
 /**
@@ -45,4 +46,38 @@ export async function currentWorkplaceLocationId(companyId: string): Promise<str
   const wp = await resolveCurrentWorkplace(companyId);
   if (!wp) return null;
   return ensureDefaultLocation(companyId, wp.siteId, wp.id);
+}
+
+/**
+ * 現在の職場の「入出庫できるか」判定。
+ * 管理者は他工場の職場も選べる（閲覧のため）が、入出庫は所属工場に限る。
+ * 画面のボタン出し分けと注意バナーはこれを見る（サーバー側の実施は scope.ts の assert* が行う）。
+ */
+export interface WorkplaceOperation {
+  workplace: WorkplaceWithSite | null;
+  /** 現在の職場で入出庫できるか */
+  operable: boolean;
+  /** 入出庫できる工場名（null＝制限なし） */
+  operableFactory: string | null;
+}
+
+export const currentWorkplaceOperation = cache(
+  async (companyId: string): Promise<WorkplaceOperation> => {
+    const [workplace, opScope] = await Promise.all([
+      resolveCurrentWorkplace(companyId),
+      currentOpSiteScope(),
+    ]);
+    if (!opScope) return { workplace, operable: true, operableFactory: null };
+    return {
+      workplace,
+      operable: workplace != null && workplace.siteId === opScope.siteId,
+      operableFactory: opScope.factory,
+    };
+  }
+);
+
+/** 現在の職場で入出庫できなければ例外。現在の職場に書き込む Server Action の入口で使う。 */
+export async function assertCurrentWorkplaceOperable(companyId: string): Promise<void> {
+  const { operable, operableFactory } = await currentWorkplaceOperation(companyId);
+  if (!operable && operableFactory) throw new Error(outOfOperationScopeMessage(operableFactory));
 }

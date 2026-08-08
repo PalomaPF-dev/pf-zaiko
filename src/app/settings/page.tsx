@@ -5,7 +5,6 @@ import { updateNotifyEmailsAction, updateAllowNegativeAction } from "@/lib/actio
 import PageHeader from "@/components/PageHeader";
 import SubmitButton from "@/components/SubmitButton";
 import MasterTabs from "@/components/MasterTabs";
-import DeleteAccountSection from "@/components/DeleteAccountSection";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +18,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl p-4 sm:p-6">
-      <PageHeader title="マスタ設定" description="商品・工場職場・取引先の各マスタと、在庫ルール・通知先を管理します。上のタブで切り替えます。作業者アカウントはポータルのユーザー設定で管理します。" />
+      <PageHeader title="マスタ設定" description="品目・工場職場・取引先の各マスタと、在庫ルール・通知先を管理します。上のタブで切り替えます。作業者アカウントはポータルのユーザー設定で管理します。" />
 
       {isAdmin && <MasterTabs />}
 
@@ -31,7 +30,7 @@ export default async function SettingsPage() {
             在庫アラート通知先
           </h2>
           <p className="mb-4 text-xs text-slate-400">
-            安全在庫を下回った商品を毎日の定期チェックで検出し、以下のアドレスへメール通知します。
+            安全在庫を下回った品目を毎日の定期チェックで検出し、以下のアドレスへメール通知します。
             カンマ区切りで複数指定できます。未設定なら登録ユーザー全員
             {!email ? "（メールアドレス登録済みの方）" : `（${email} など）`}に送信します。
           </p>
@@ -79,8 +78,7 @@ export default async function SettingsPage() {
 
       {/* 作業者管理（旧・アプリ内名簿）は廃止。作業者アカウントはポータルのユーザー設定で管理する */}
 
-      {/* 危険な操作（アカウント削除＝退会） */}
-      <DeleteAccountSection />
+      {/* アカウントの発行・削除はポータルで管理する（アプリ内には退会導線を持たない） */}
     </div>
   );
 }

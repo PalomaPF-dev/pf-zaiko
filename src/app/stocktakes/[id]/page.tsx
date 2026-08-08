@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Printer, Download, Save, CheckCircle2, Undo2, XCircle } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { getStocktake, listStocktakeLines } from "@/lib/db";
-import { currentScope } from "@/lib/scope";
+import { canOperateStocktake, currentScope } from "@/lib/scope";
 import {
   saveStocktakeCountsAction,
   reviewStocktakeAction,
@@ -17,6 +17,7 @@ import SubmitButton from "@/components/SubmitButton";
 import ConfirmForm from "@/components/ConfirmForm";
 import { StocktakeStatusBadge } from "@/components/Badges";
 import DbErrorState from "@/components/DbErrorState";
+import ViewOnlySiteNotice from "@/components/ViewOnlySiteNotice";
 import OperatorSelect from "@/components/OperatorSelect";
 
 export const dynamic = "force-dynamic";
@@ -28,11 +29,14 @@ export default async function StocktakeDetailPage({ params }: { params: Promise<
   // 他工場の棚卸は開けない（スコープ外なら null → 404）
   const { siteId } = await currentScope();
 
-  let take, lines;
+  let take, lines, operable;
   try {
     take = await getStocktake(companyId, id, siteId);
     if (!take) notFound();
-    lines = await listStocktakeLines(companyId, id);
+    [lines, operable] = await Promise.all([
+      listStocktakeLines(companyId, id),
+      canOperateStocktake(companyId, id),
+    ]);
   } catch (e) {
     console.error("[stocktake detail]", e);
     return (
@@ -43,7 +47,8 @@ export default async function StocktakeDetailPage({ params }: { params: Promise<
     );
   }
 
-  const editable = take.status === "counting" || take.status === "review";
+  // 他工場の棚卸は閲覧のみ（実棚入力・反映・中止はできない）
+  const editable = (take.status === "counting" || take.status === "review") && operable;
   const countedCount = lines.filter((l) => l.countedQty != null).length;
   const diffLines = lines.filter((l) => l.diff != null && l.diff !== 0);
   const saveCounts = saveStocktakeCountsAction.bind(null, id);
@@ -59,6 +64,8 @@ export default async function StocktakeDetailPage({ params }: { params: Promise<
         description={`${take.scopeArea ?? "—"} ・ ${take.createdBy} ・ ${formatDateTime(take.createdAt)}`}
         action={<StocktakeStatusBadge status={take.status} />}
       />
+
+      {!operable && <ViewOnlySiteNotice companyId={companyId} />}
 
       {/* 進捗＋操作 */}
       <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4">
@@ -89,12 +96,12 @@ export default async function StocktakeDetailPage({ params }: { params: Promise<
             <Download className="h-4 w-4" />
             CSV
           </a>
-          {take.status === "counting" && (
+          {editable && take.status === "counting" && (
             <form action={reviewStocktakeAction.bind(null, id)}>
               <SubmitButton pendingText="…">差異確認へ</SubmitButton>
             </form>
           )}
-          {take.status === "review" && (
+          {editable && take.status === "review" && (
             <>
               <form action={backToCountingAction.bind(null, id)}>
                 <button className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">

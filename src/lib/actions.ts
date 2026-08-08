@@ -4,14 +4,20 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { requireEntitledSession, requireAdminSession, requireSession } from "./session";
-import { CURRENT_WP_COOKIE, currentWorkplaceLocationId, resolveCurrentWorkplace } from "./workplace";
 import {
-  assertIssueOrderInScope,
-  assertLocationInScope,
-  assertReceiptInScope,
-  assertStocktakeInScope,
-  assertWorkplaceInScope,
-  currentSiteScope,
+  CURRENT_WP_COOKIE,
+  assertCurrentWorkplaceOperable,
+  currentWorkplaceLocationId,
+  resolveCurrentWorkplace,
+} from "./workplace";
+import {
+  assertIssueOrderOperable,
+  assertLocationOperable,
+  assertReceiptOperable,
+  assertStocktakeOperable,
+  assertWorkplaceOperable,
+  assertWorkplaceVisible,
+  currentOpSiteScope,
   scopeSiteId,
 } from "./scope";
 import {
@@ -60,9 +66,13 @@ import {
   addReceiptLine,
   deleteReceiptLine,
   putawayProduct,
+  bulkCreateProductsFromItems,
+  getItemMastersByCodes,
   type ProductInput,
   type PartnerInput,
 } from "./db";
+import { reimportItemMaster } from "./itemMasterSeed";
+import { itemUnitForProduct, normalizeItemCode } from "./itemCode";
 import { IO_TX_TYPES, PARTNER_KIND_LABEL, type TxType, type PartnerKind } from "./types";
 
 // ===== FormData ヘルパー =====
@@ -105,10 +115,10 @@ export interface ActionResult {
   id?: string; // 作成/更新した対象のID（クライアント側の遷移用）
 }
 
-// ===== 商品マスタ =====
+// ===== 品目マスタ =====
 
 /**
- * 商品の一意制約違反(23505)を利用者向けの日本語メッセージへ変換。
+ * 品目の一意制約違反(23505)を利用者向けの日本語メッセージへ変換。
  * 全画面のサーバーエラーにせず、フォーム上にインライン表示するために使う。
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -117,15 +127,15 @@ function productDuplicateMessage(e: any): string | null {
   if (code !== "23505") return null;
   const constraint = String(e?.constraint ?? e?.sourceError?.constraint ?? "");
   if (constraint.includes("drawing_no")) {
-    return "この図番は既に登録されています。別の図番にするか、既存の商品を編集してください。";
+    return "この図番は既に登録されています。別の図番にするか、既存の品目を編集してください。";
   }
   if (constraint.includes("stockkey")) {
     return "この在庫管理キーは既に登録されています。別のキーを入力してください。";
   }
   if (constraint.includes("code")) {
-    return "この商品CDは既に登録されています。別の商品CDを入力してください。";
+    return "この品目CDは既に登録されています。別の品目CDを入力してください。";
   }
-  return "図番・商品CD・在庫管理キーのいずれかが既に登録されています。入力内容をご確認ください。";
+  return "図番・品目CD・在庫管理キーのいずれかが既に登録されています。入力内容をご確認ください。";
 }
 
 function readProductInput(fd: FormData): ProductInput {
@@ -148,7 +158,7 @@ function readProductInput(fd: FormData): ProductInput {
   };
 }
 
-/** 商品登録。重複などの失敗は全画面エラーにせず ActionResult で返す（フォームにインライン表示・入力値保持）。 */
+/** 品目登録。重複などの失敗は全画面エラーにせず ActionResult で返す（フォームにインライン表示・入力値保持）。 */
 export async function createProductAction(fd: FormData): Promise<ActionResult> {
   const { companyId } = await requireAdminSession();
   const input = readProductInput(fd);
@@ -192,6 +202,51 @@ export async function deleteProductAction(id: string): Promise<void> {
   await deleteProduct(companyId, id);
   revalidatePath("/products");
   redirect("/products");
+}
+
+// ===== 資材W/F 品目カタログ =====
+
+/** 同梱の品目カタログを取り込み直す（版が同じでも上書き）。管理者のみ。 */
+export async function reimportItemMasterAction(): Promise<void> {
+  const { companyId } = await requireAdminSession();
+  await reimportItemMaster(companyId);
+  revalidatePath("/items");
+}
+
+/** 一度に登録できる上限。カタログ1ページ分（100件）を選び切っても余裕がある値。 */
+const BULK_REGISTER_LIMIT = 500;
+
+/**
+ * カタログで選択した品目を、品目マスタへ一括登録する（管理者のみ）。
+ * カタログは役務・費用系（保守・処理・運賃など）も含むため全件は入れず、
+ * 現物在庫を持つ品目だけを選んで登録してもらう前提。
+ * 登録済みのコードは自動で除外されるので、二重に押しても増えない。
+ */
+export async function bulkRegisterItemsAction(fd: FormData): Promise<void> {
+  const { companyId } = await requireAdminSession();
+  const codes = Array.from(
+    new Set(
+      fd
+        .getAll("codes")
+        .map((v) => normalizeItemCode(String(v)))
+        .filter((c): c is string => c != null)
+    )
+  );
+  if (codes.length === 0) redirect("/items");
+  if (codes.length > BULK_REGISTER_LIMIT) {
+    throw new Error(`一度に登録できるのは ${BULK_REGISTER_LIMIT} 品目までです`);
+  }
+
+  // 単位は W/F の単位コード表が判明しているものだけ引き継ぐ（不明なら既定の「個」）
+  const items = await getItemMastersByCodes(companyId, codes);
+  const created = await bulkCreateProductsFromItems(
+    companyId,
+    items.map((i) => ({ code: i.code, unit: itemUnitForProduct(i.unitCode) }))
+  );
+
+  revalidatePath("/items");
+  revalidatePath("/products");
+  redirect(`/items?registered=${created}&selected=${codes.length}`);
 }
 
 // ===== ロケーション =====
@@ -278,7 +333,7 @@ export async function recordMovementAction(fd: FormData): Promise<ActionResult> 
   const productId = str(fd, "productId");
   const locationId = str(fd, "locationId");
   const txType = str(fd, "txType") as TxType;
-  if (!productId || !locationId) return { ok: false, message: "商品とロケーションを指定してください" };
+  if (!productId || !locationId) return { ok: false, message: "品目とロケーションを指定してください" };
   if (!IO_TX_TYPES.includes(txType)) return { ok: false, message: "処理区分が不正です" };
   const qtyRaw = intOrNull(fd, "qty");
   if (qtyRaw == null || (txType !== "adjust" && qtyRaw <= 0)) {
@@ -286,7 +341,7 @@ export async function recordMovementAction(fd: FormData): Promise<ActionResult> 
   }
   try {
     // 所属工場の外の置き場へは書き込ませない（UIで出さないが、サーバー側でも必ず防ぐ）
-    await assertLocationInScope(companyId, locationId);
+    await assertLocationOperable(companyId, locationId);
     const allowNegative = await getAllowNegative(companyId);
     const { qtyAfter, txId } = await applyMovement(
       companyId,
@@ -326,12 +381,12 @@ export async function moveStockAction(fd: FormData): Promise<ActionResult> {
   const toLocationId = str(fd, "toLocationId");
   const qty = intOrNull(fd, "qty");
   if (!productId || !fromLocationId || !toLocationId) {
-    return { ok: false, message: "商品・移動元・移動先を指定してください" };
+    return { ok: false, message: "品目・移動元・移動先を指定してください" };
   }
   if (qty == null || qty <= 0) return { ok: false, message: "数量を正しく入力してください" };
   try {
-    await assertLocationInScope(companyId, fromLocationId);
-    await assertLocationInScope(companyId, toLocationId);
+    await assertLocationOperable(companyId, fromLocationId);
+    await assertLocationOperable(companyId, toLocationId);
     const allowNegative = await getAllowNegative(companyId);
     const { txId } = await moveStock(
       companyId,
@@ -362,6 +417,8 @@ export async function createStocktakeAction(fd: FormData): Promise<void> {
   const { companyId, userName } = await requireEntitledSession();
   const title = str(fd, "title");
   if (!title) throw new Error("棚卸の名称を入力してください");
+  // 棚卸は在庫を書き換えるので、所属工場の職場でしか始められない
+  await assertCurrentWorkplaceOperable(companyId);
   const wp = await resolveCurrentWorkplace(companyId);
   if (!wp) throw new Error("職場が未登録です。先に工場・職場を登録してください。");
   const id = await createStocktake(companyId, {
@@ -378,7 +435,7 @@ export async function createStocktakeAction(fd: FormData): Promise<void> {
 /** 実棚数をまとめて保存（明細フォームの count_<lineId> を一括反映）。空欄はスキップ。 */
 export async function saveStocktakeCountsAction(stocktakeId: string, fd: FormData): Promise<void> {
   const { companyId, userName, role } = await requireEntitledSession();
-  await assertStocktakeInScope(companyId, stocktakeId);
+  await assertStocktakeOperable(companyId, stocktakeId);
   const operator = resolveOperator(fd, role, userName);
   const tasks: Promise<void>[] = [];
   for (const [key, value] of fd.entries()) {
@@ -396,7 +453,7 @@ export async function saveStocktakeCountsAction(stocktakeId: string, fd: FormDat
 
 export async function reviewStocktakeAction(id: string): Promise<void> {
   const { companyId } = await requireEntitledSession();
-  await assertStocktakeInScope(companyId, id);
+  await assertStocktakeOperable(companyId, id);
   await updateStocktakeStatus(companyId, id, "review");
   revalidatePath(`/stocktakes/${id}`);
   revalidatePath("/stocktakes");
@@ -404,14 +461,14 @@ export async function reviewStocktakeAction(id: string): Promise<void> {
 
 export async function backToCountingAction(id: string): Promise<void> {
   const { companyId } = await requireEntitledSession();
-  await assertStocktakeInScope(companyId, id);
+  await assertStocktakeOperable(companyId, id);
   await updateStocktakeStatus(companyId, id, "counting");
   revalidatePath(`/stocktakes/${id}`);
 }
 
 export async function cancelStocktakeAction(id: string): Promise<void> {
   const { companyId } = await requireEntitledSession();
-  await assertStocktakeInScope(companyId, id);
+  await assertStocktakeOperable(companyId, id);
   await updateStocktakeStatus(companyId, id, "cancelled");
   revalidatePath(`/stocktakes/${id}`);
   revalidatePath("/stocktakes");
@@ -420,7 +477,7 @@ export async function cancelStocktakeAction(id: string): Promise<void> {
 
 export async function applyStocktakeAction(id: string): Promise<void> {
   const { companyId, userName } = await requireEntitledSession();
-  await assertStocktakeInScope(companyId, id);
+  await assertStocktakeOperable(companyId, id);
   const applied = await applyStocktake(companyId, id, userName || "（未設定）");
   if (!applied) throw new Error("この棚卸はすでに反映・中止済みです");
   revalidatePath(`/stocktakes/${id}`);
@@ -434,6 +491,7 @@ export async function applyStocktakeAction(id: string): Promise<void> {
 
 export async function createIssueOrderAction(fd: FormData): Promise<void> {
   const { companyId, userName } = await requireEntitledSession();
+  await assertCurrentWorkplaceOperable(companyId);
   const orderNo = str(fd, "orderNo") || (await nextOrderNo(companyId));
   // 出庫元の工場を記録（工場スコープの絞り込みに使う）
   const wp = await resolveCurrentWorkplace(companyId);
@@ -453,15 +511,15 @@ export async function createIssueOrderAction(fd: FormData): Promise<void> {
 
 export async function addIssueOrderLineAction(orderId: string, fd: FormData): Promise<void> {
   const { companyId } = await requireEntitledSession();
-  await assertIssueOrderInScope(companyId, orderId);
+  await assertIssueOrderOperable(companyId, orderId);
   const productId = str(fd, "productId");
   const qty = intOrNull(fd, "qtyPlanned");
-  if (!productId) throw new Error("商品を選択してください");
+  if (!productId) throw new Error("品目を選択してください");
   if (qty == null || qty <= 0) throw new Error("出荷予定数を正しく入力してください");
   // 引当は現在の職場のロケに限定する
   const wp = await resolveCurrentWorkplace(companyId);
   const locationId = strOrNull(fd, "locationId");
-  if (locationId) await assertLocationInScope(companyId, locationId);
+  if (locationId) await assertLocationOperable(companyId, locationId);
   await addIssueOrderLine(companyId, orderId, {
     productId,
     locationId,
@@ -474,7 +532,7 @@ export async function addIssueOrderLineAction(orderId: string, fd: FormData): Pr
 
 export async function deleteIssueOrderLineAction(orderId: string, lineId: string): Promise<void> {
   const { companyId } = await requireEntitledSession();
-  await assertIssueOrderInScope(companyId, orderId);
+  await assertIssueOrderOperable(companyId, orderId);
   await deleteIssueOrderLine(companyId, lineId);
   revalidatePath(`/issue-orders/${orderId}`);
 }
@@ -483,7 +541,7 @@ export async function deleteIssueOrderLineAction(orderId: string, lineId: string
 export async function issueOrderLineAction(orderId: string, lineId: string): Promise<ActionResult> {
   const { companyId, userName } = await requireEntitledSession();
   try {
-    await assertIssueOrderInScope(companyId, orderId);
+    await assertIssueOrderOperable(companyId, orderId);
     const allowNegative = await getAllowNegative(companyId);
     const { qtyAfter } = await issueOrderLine(companyId, orderId, lineId, userName || "（未設定）", allowNegative);
     revalidatePath(`/issue-orders/${orderId}`);
@@ -500,7 +558,7 @@ export async function issueOrderLineAction(orderId: string, lineId: string): Pro
 export async function issueAllOrderLinesAction(orderId: string): Promise<ActionResult> {
   const { companyId, userName } = await requireEntitledSession();
   try {
-    await assertIssueOrderInScope(companyId, orderId);
+    await assertIssueOrderOperable(companyId, orderId);
     const allowNegative = await getAllowNegative(companyId);
     const { issued, skipped, failed } = await issueAllOrderLines(companyId, orderId, userName || "（未設定）", allowNegative);
     revalidatePath(`/issue-orders/${orderId}`);
@@ -519,7 +577,7 @@ export async function issueAllOrderLinesAction(orderId: string): Promise<ActionR
 
 export async function cancelIssueOrderAction(id: string): Promise<void> {
   const { companyId } = await requireEntitledSession();
-  await assertIssueOrderInScope(companyId, id);
+  await assertIssueOrderOperable(companyId, id);
   await updateIssueOrderStatus(companyId, id, "cancelled");
   revalidatePath("/issue-orders");
   revalidatePath(`/issue-orders/${id}`);
@@ -531,6 +589,7 @@ export async function cancelIssueOrderAction(id: string): Promise<void> {
 /** ①入荷：受入伝票を作成（納入場所を指定）。 */
 export async function createReceiptAction(fd: FormData): Promise<void> {
   const { companyId, userName } = await requireEntitledSession();
+  await assertCurrentWorkplaceOperable(companyId);
   // 受け入れた工場を記録（工場スコープの絞り込み・棚入れ候補の限定に使う）
   const wp = await resolveCurrentWorkplace(companyId);
   const { id } = await createReceipt(companyId, {
@@ -545,9 +604,9 @@ export async function createReceiptAction(fd: FormData): Promise<void> {
 /** ①入荷：受入明細を追加（箱数×入り数=合計 or 合計直接）。 */
 export async function addReceiptLineAction(receiptId: string, fd: FormData): Promise<void> {
   const { companyId } = await requireEntitledSession();
-  await assertReceiptInScope(companyId, receiptId);
+  await assertReceiptOperable(companyId, receiptId);
   const productId = str(fd, "productId");
-  if (!productId) throw new Error("商品を選択してください");
+  if (!productId) throw new Error("品目を選択してください");
   const perBox = intOrNull(fd, "perBox");
   const boxCount = intOrNull(fd, "boxCount");
   const qty = intOrNull(fd, "qty");
@@ -564,7 +623,7 @@ export async function addReceiptLineAction(receiptId: string, fd: FormData): Pro
 
 export async function deleteReceiptLineAction(receiptId: string, lineId: string): Promise<void> {
   const { companyId } = await requireEntitledSession();
-  await assertReceiptInScope(companyId, receiptId);
+  await assertReceiptOperable(companyId, receiptId);
   await deleteReceiptLine(companyId, lineId);
   revalidatePath(`/inbound/${receiptId}`);
 }
@@ -575,18 +634,18 @@ export async function putawayAction(fd: FormData): Promise<ActionResult> {
   const productId = str(fd, "productId");
   const locationId = str(fd, "locationId");
   const qty = intOrNull(fd, "qty");
-  if (!productId) return { ok: false, message: "商品を指定してください（ラベルをスキャン）" };
+  if (!productId) return { ok: false, message: "品目を指定してください（ラベルをスキャン）" };
   if (!locationId) return { ok: false, message: "棚入れ先ロケーションを指定してください" };
   if (qty == null || qty <= 0) return { ok: false, message: "数量を正しく入力してください" };
   try {
     // 棚入れ先も、消し込む入荷も所属工場の中に限定する
-    await assertLocationInScope(companyId, locationId);
+    await assertLocationOperable(companyId, locationId);
     const { qtyAfter } = await putawayProduct(companyId, {
       productId,
       locationId,
       qty,
       operator: resolveOperator(fd, role, userName),
-      siteId: scopeSiteId(await currentSiteScope()),
+      siteId: scopeSiteId(await currentOpSiteScope()),
     });
     revalidatePath("/putaway");
     revalidatePath("/stock");
@@ -698,8 +757,9 @@ export async function deleteWorkplaceAction(id: string): Promise<void> {
 /** ヘッダの職場セレクタ: 現在の職場を Cookie に保存し、全画面を再取得させる。 */
 export async function setCurrentWorkplaceAction(workplaceId: string): Promise<void> {
   const { companyId } = await requireSession();
-  // スコープ外の職場へは切り替えさせない（Cookie を直接書き換えても resolveCurrentWorkplace が弾く）
-  await assertWorkplaceInScope(companyId, workplaceId);
+  // 閲覧スコープ外の職場へは切り替えさせない（Cookie を直接書き換えても resolveCurrentWorkplace が弾く）。
+  // 管理者は他工場の職場も選べる（閲覧のため）。そこで入出庫できるかは各アクション側で判定する。
+  await assertWorkplaceVisible(companyId, workplaceId);
   const c = await cookies();
   c.set(CURRENT_WP_COOKIE, workplaceId, {
     path: "/",
@@ -760,6 +820,8 @@ export async function supplyMovementAction(fd: FormData): Promise<ActionResult> 
   if (!locationId) return { ok: false, message: "職場が未登録です。先に工場・職場を登録してください。" };
 
   try {
+    // 所属工場以外の職場が選ばれている状態では書き込ませない
+    await assertCurrentWorkplaceOperable(companyId);
     const allowNegative = await getAllowNegative(companyId);
     const { qtyAfter } = await applyMovement(
       companyId,
@@ -801,9 +863,10 @@ export async function supplyMoveAction(fd: FormData): Promise<ActionResult> {
   if (destWorkplaceId === wp.id) return { ok: false, message: "移動先が現在の職場と同じです" };
   const dest = await getWorkplace(companyId, destWorkplaceId);
   if (!dest) return { ok: false, message: "移動先の職場が見つかりません" };
-  // 所属工場の外へは移動させない
+  // 移動元・移動先とも所属工場の中に限る
   try {
-    await assertWorkplaceInScope(companyId, destWorkplaceId);
+    await assertCurrentWorkplaceOperable(companyId);
+    await assertWorkplaceOperable(companyId, destWorkplaceId);
   } catch (e: any) {
     return { ok: false, message: e?.message ?? "移動先が範囲外です" };
   }
@@ -838,6 +901,7 @@ export async function supplyAdjustAction(fd: FormData): Promise<ActionResult> {
   if (!locationId) return { ok: false, message: "職場が未登録です。先に工場・職場を登録してください。" };
 
   try {
+    await assertCurrentWorkplaceOperable(companyId);
     const cur = await getStockCell(companyId, productId, locationId);
     const delta = targetQty - (cur?.qty ?? 0);
     if (delta === 0) return { ok: true, message: "在庫は既に一致しています（変更なし）" };

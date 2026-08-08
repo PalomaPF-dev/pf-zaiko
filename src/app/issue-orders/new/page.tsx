@@ -21,7 +21,7 @@ export default async function NewIssueOrderPage() {
         <ArrowLeft className="h-4 w-4" />
         出庫一覧に戻る
       </Link>
-      <PageHeader title="出庫を作成" description="得意先などは任意です。作成後に出庫する部材（商品・数量）を追加します。" />
+      <PageHeader title="出庫を作成" description="得意先などは任意です。作成後に出庫する部材（品目・数量）を追加します。" />
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5">
         <form action={createIssueOrderAction} className="flex flex-col gap-4">

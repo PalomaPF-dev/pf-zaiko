@@ -19,7 +19,7 @@ const input =
 
 /**
  * ①入荷（受入）の明細追加フォーム。
- * 商品マスタを検索して選択（ラベルは未発行なのでスキャンは使わない）→ 仕入先を自動表示・入り数はロットサイズ既定
+ * 品目マスタを検索して選択（ラベルは未発行なのでスキャンは使わない）→ 仕入先を自動表示・入り数はロットサイズ既定
  * → 箱数×入り数=合計 → 追加。追加のたびにリセットして次々に登録できる。
  */
 export default function ReceivingLineForm({
@@ -78,7 +78,7 @@ export default function ReceivingLineForm({
     <form action={onSubmit} className="flex flex-col gap-3">
       <input type="hidden" name="productId" value={productId} />
 
-      {/* 商品検索 / 選択 */}
+      {/* 品目検索 / 選択 */}
       {selected ? (
         <div className="flex items-center justify-between gap-2 rounded-lg border border-fuchsia-200 bg-fuchsia-50/50 px-3 py-2">
           <div className="min-w-0">
@@ -110,7 +110,7 @@ export default function ReceivingLineForm({
                 setOpen(true);
               }}
               onFocus={() => setOpen(true)}
-              placeholder="商品を検索（図番・商品CD・品名）"
+              placeholder="品目を検索（図番・品目CD・品名）"
               className="w-full text-sm focus:outline-none"
             />
           </div>
@@ -137,7 +137,7 @@ export default function ReceivingLineForm({
           )}
           {open && q !== "" && matches.length === 0 && (
             <div className="absolute z-20 mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-400 shadow-lg">
-              該当する商品がありません
+              該当する品目がありません
             </div>
           )}
         </div>

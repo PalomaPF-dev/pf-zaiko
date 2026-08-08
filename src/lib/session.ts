@@ -71,7 +71,7 @@ export async function requireAdminSession(): Promise<AppSession> {
 /**
  * マスタ系ページ用: ログイン＋利用権に加えて管理者（role=admin）を要求。
  * 一般ユーザー（member）は "/" にリダイレクトして描画させない。
- * マスタ設定のサーバーコンポーネント（商品・ロケーション・取引先・拠点など）で使う。
+ * マスタ設定のサーバーコンポーネント（品目・ロケーション・取引先・拠点など）で使う。
  */
 export async function requireAdminPage(): Promise<AppSession> {
   const s = await requireEntitledSession();
@@ -90,19 +90,37 @@ export function factoryScopeOf(role: UserRole | null, factory: string | null): s
   return role === "admin" ? null : factory;
 }
 
+/**
+ * 入出庫スコープ（データ更新制限）の判定。閲覧スコープと違い、**役割では緩まない**。
+ * - 工場に所属しているユーザー（ポータルの部署が「工場」種別） → その工場でしか入出庫できない。
+ *   管理者も同じ。管理者は全工場を「見られる」が、入出庫できるのは自分の工場だけ。
+ * - 工場に所属していないユーザー（ポータル管理者など部署が工場でない） → null＝全工場で入出庫可。
+ */
+export function operationScopeOf(factory: string | null): string | null {
+  return factory;
+}
+
 /** AppSession に所属工場（DB由来）と工場スコープを足したもの。 */
 export interface ScopedSession extends AppSession {
   /** ポータルから連携された所属工場名（未設定なら null） */
   factory: string | null;
   /** 非 null のとき、その工場のデータだけを閲覧できる（null＝制限なし） */
   factoryScope: string | null;
+  /** 非 null のとき、その工場でしか入出庫できない（null＝全工場で入出庫可） */
+  operationScope: string | null;
 }
 
 /** セッション＋DBの役割・所属工場を1つにまとめる（role は DB を優先）。 */
 async function withFactory(s: AppSession): Promise<ScopedSession> {
   const { role, factory } = await getUserRoleAndFactory(s.userId);
   const effectiveRole = role ?? s.role;
-  return { ...s, role: effectiveRole, factory, factoryScope: factoryScopeOf(effectiveRole, factory) };
+  return {
+    ...s,
+    role: effectiveRole,
+    factory,
+    factoryScope: factoryScopeOf(effectiveRole, factory),
+    operationScope: operationScopeOf(factory),
+  };
 }
 
 /**

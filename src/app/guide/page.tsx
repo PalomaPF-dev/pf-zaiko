@@ -13,6 +13,7 @@ import {
   ClipboardCheck,
   Bell,
   BookOpen,
+  BookMarked,
   Info,
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
@@ -64,11 +65,21 @@ export default function GuidePage() {
           作成したロケは<b>ロケラベル</b>を発行して棚に貼ります。別の職場のロケを作るときは、ヘッダの職場セレクタで切り替えてから作成してください。
         </GuideStep>
 
-        <GuideStep no={4} icon={Package} title="副資材を登録する" href="/products/new" linkLabel="副資材を登録">
+        <GuideStep no={4} icon={Package} title="品目（副資材）を登録する" href="/products/new" linkLabel="品目を登録">
           <b>品名</b>と<b>メーカー品番</b>（QR・検索の主キー）を登録します。単位・<b>安全在庫（下限）</b>・規格・メーカーも設定でき、安全在庫を下回るとアラート対象になります。
+          <br />
+          <b>資材W/F に登録済みの品目</b>なら、フォーム冒頭の「<b>品目コードから呼び出す</b>」に品目コード（例{" "}
+          <span className="font-mono">06-26105-00</span>）を入れると、品名・購入先・ロットサイズが自動で入ります。
         </GuideStep>
 
-        <GuideStep no={5} icon={Contact} title="取引先を登録する（任意）" href="/partners" linkLabel="取引先">
+        <GuideStep no={5} icon={BookMarked} title="資材W/F の品目カタログから探す" href="/items" linkLabel="品目カタログ">
+          資材W/F の品目カタログを取り込んであります。<b>品目コード・品名・仕入先</b>で検索し、
+          <b>現物在庫として管理する品目だけ</b>をチェックして「<b>品目マスタに一括登録</b>」できます（1件ずつの登録も可）。
+          保守・処理・運賃などの役務・費用系は登録不要です。品目コードは<b>図番</b>として登録され、
+          以降は<b>スキャン・手入力でその品目コードから呼び出せます</b>。
+        </GuideStep>
+
+        <GuideStep no={6} icon={Contact} title="取引先を登録する（任意）" href="/partners" linkLabel="取引先">
           <b>仕入先</b>（入荷で選択）・<b>出荷先</b>（出庫指示で選択）・<b>移動先</b>（社内）を登録しておくと、各画面で選べます。
         </GuideStep>
       </div>
@@ -77,17 +88,17 @@ export default function GuidePage() {
       <h2 className="mb-4 mt-10 border-l-4 border-fuchsia-600 pl-3 text-lg font-bold text-slate-800">日常運用（入荷業務・出荷業務・在庫管理）</h2>
       <div className="flex flex-col gap-4">
         <GuideStep no={1} icon={ScanLine} title="いまの職場を選ぶ／スキャンして開く" href="/scan" linkLabel="スキャン">
-          ヘッダの<b>職場セレクタ</b>で作業中の工場・職場を選びます。<b>スキャン</b>では、商品QR→在庫画面、ロケQR→在庫照会が開きます（手入力でも可）。
+          ヘッダの<b>職場セレクタ</b>で作業中の工場・職場を選びます。<b>スキャン</b>では、品目QR→在庫画面、ロケQR→在庫照会が開きます（手入力でも可）。
         </GuideStep>
 
         <GuideStep no={2} icon={ArrowDownToLine} title="入荷業務：入荷（受入）→ 入庫（棚入れ）" href="/inbound" linkLabel="入荷">
           <ol className="list-decimal space-y-1 pl-5">
             <li>
-              <b>入荷（受入）</b>：<b>納入場所</b>を指定し、<b>商品を検索</b>して<b>箱数×入り数＝合計</b>で数量を入れ、入荷を登録します。
-              登録後、<b>商品ラベル</b>（QR＝メーカー品番）を発行して現品に貼ります。<b>この段階ではロケは未定（未入庫）</b>です。
+              <b>入荷（受入）</b>：<b>納入場所</b>を指定し、<b>品目を検索</b>して<b>箱数×入り数＝合計</b>で数量を入れ、入荷を登録します。
+              登録後、<b>品目ラベル</b>（QR＝メーカー品番）を発行して現品に貼ります。<b>この段階ではロケは未定（未入庫）</b>です。
             </li>
             <li>
-              <b>入庫（棚入れ）</b>：貼った<b>商品ラベルをスキャン</b>（または未入庫一覧から選択）→<b>現在の職場のロケ</b>を付与して棚入れします。
+              <b>入庫（棚入れ）</b>：貼った<b>品目ラベルをスキャン</b>（または未入庫一覧から選択）→<b>現在の職場のロケ</b>を付与して棚入れします。
               棚入れした在庫だけが出庫の対象になります。
             </li>
           </ol>
@@ -97,7 +108,7 @@ export default function GuidePage() {
           <ol className="list-decimal space-y-1 pl-5">
             <li>出庫する<b>部材を選択</b>して<b>出庫指示リストを作成</b>（在庫最多の<b>現在の職場のロケ</b>を自動引当）。</li>
             <li>指示リストを<b>印刷</b>し、<b>ロケが近い順</b>に効率よくピッキング。</li>
-            <li>各行の「<b>照合出庫</b>」で3つのQR（<b>指示リスト／商品ラベル／ロケラベル</b>）を読み、<b>3点が一致すれば出庫確定</b>。誤出荷を防止します。急ぎは「<b>一括確定</b>」も可能。</li>
+            <li>各行の「<b>照合出庫</b>」で3つのQR（<b>指示リスト／品目ラベル／ロケラベル</b>）を読み、<b>3点が一致すれば出庫確定</b>。誤出荷を防止します。急ぎは「<b>一括確定</b>」も可能。</li>
           </ol>
         </GuideStep>
 

@@ -13,7 +13,7 @@ import DbErrorState from "@/components/DbErrorState";
 
 export const dynamic = "force-dynamic";
 
-/** ①入荷：レ点した受入明細の商品ラベル（50×35mm）を A4 面付けで発行する。 */
+/** ①入荷：レ点した受入明細の品目ラベル（50×35mm）を A4 面付けで発行する。 */
 export default async function ReceiptLabelsPage({
   params,
   searchParams,
@@ -93,9 +93,9 @@ export default async function ReceiptLabelsPage({
         <PrintButton />
       </div>
 
-      <h1 className="no-print mb-1 text-xl font-bold text-slate-800">商品ラベル（{lines.length}件）</h1>
+      <h1 className="no-print mb-1 text-xl font-bold text-slate-800">品目ラベル（{lines.length}件）</h1>
       <p className="no-print mb-4 text-sm text-slate-500">
-        入荷した現品に貼る商品ラベル（50×35mm・QR=在庫管理キー）です。SATO のラベルプリンターは用紙 50×35mm・
+        入荷した現品に貼る品目ラベル（50×35mm・QR=在庫管理キー）です。SATO のラベルプリンターは用紙 50×35mm・
         <b>倍率100%（実寸）・余白なし</b>で印刷。A4プリンタなら「PDFとして保存」も可能です。
       </p>
 
@@ -107,7 +107,7 @@ export default async function ReceiptLabelsPage({
             <div key={l.id} className="rtag">
               <div className="nm">{l.productName}</div>
               <div className="cdrow">
-                <span className="cd">商品CD:{l.productCode ?? l.drawingNo}</span>
+                <span className="cd">品目CD:{l.productCode ?? l.drawingNo}</span>
                 <span className="date">{formatDate(receipt.createdAt)}</span>
               </div>
               <div className="mid">

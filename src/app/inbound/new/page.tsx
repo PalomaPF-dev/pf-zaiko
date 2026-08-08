@@ -21,7 +21,7 @@ export default async function NewReceiptPage() {
       </Link>
       <PageHeader
         title="入荷を登録"
-        description="受入担当者が納入場所を指定します。作成後に、商品マスタから検索して入荷した商品を次々に登録します。"
+        description="受入担当者が納入場所を指定します。作成後に、品目マスタから検索して入荷した品目を次々に登録します。"
       />
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -32,7 +32,7 @@ export default async function NewReceiptPage() {
             <p className="mt-1 text-xs text-slate-400">現品票にも印字されます（任意）。</p>
           </div>
           <div>
-            <SubmitButton pendingText="作成中…">作成して商品を登録</SubmitButton>
+            <SubmitButton pendingText="作成中…">作成して品目を登録</SubmitButton>
           </div>
         </form>
       </div>

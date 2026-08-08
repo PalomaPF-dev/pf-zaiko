@@ -4,7 +4,7 @@ import { ArrowLeft, Printer, Plus, ScanLine, Trash2, XCircle } from "lucide-reac
 import { requireEntitledSession } from "@/lib/session";
 import { getIssueOrder, listIssueOrderLines, listProducts, listLocations } from "@/lib/db";
 import { resolveCurrentWorkplace } from "@/lib/workplace";
-import { currentScope } from "@/lib/scope";
+import { canOperateIssueOrder, currentScope } from "@/lib/scope";
 import {
   addIssueOrderLineAction,
   deleteIssueOrderLineAction,
@@ -20,6 +20,7 @@ import ConfirmForm from "@/components/ConfirmForm";
 import PickVerify from "@/components/PickVerify";
 import BulkIssueButton from "@/components/BulkIssueButton";
 import DbErrorState from "@/components/DbErrorState";
+import ViewOnlySiteNotice from "@/components/ViewOnlySiteNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -30,15 +31,16 @@ export default async function IssueOrderDetailPage({ params }: { params: Promise
   // 他工場の出庫指示は開けない
   const { siteId } = await currentScope();
 
-  let order, lines, products, locations;
+  let order, lines, products, locations, operable;
   try {
     order = await getIssueOrder(companyId, id, siteId);
     if (!order) notFound();
     const wp = await resolveCurrentWorkplace(companyId);
-    [lines, products, locations] = await Promise.all([
+    [lines, products, locations, operable] = await Promise.all([
       listIssueOrderLines(companyId, id),
       listProducts(companyId, { activeOnly: true }),
       listLocations(companyId, { workplaceId: wp?.id ?? null }),
+      canOperateIssueOrder(companyId, id),
     ]);
   } catch (e) {
     console.error("[issue-order detail]", e);
@@ -50,7 +52,8 @@ export default async function IssueOrderDetailPage({ params }: { params: Promise
     );
   }
 
-  const editable = order.status === "open" || order.status === "picking";
+  // 他工場の出庫指示は閲覧のみ（明細追加・出庫・中止はできない）
+  const editable = (order.status === "open" || order.status === "picking") && operable;
   const remaining = lines.filter((l) => l.qtyIssued < l.qtyInstructed).length;
   const addLine = addIssueOrderLineAction.bind(null, id);
 
@@ -89,6 +92,8 @@ export default async function IssueOrderDetailPage({ params }: { params: Promise
         }
       />
 
+      {!operable && <ViewOnlySiteNotice companyId={companyId} />}
+
       {/* 確定前の一覧確認・一括出庫 */}
       {editable && lines.length > 0 && (
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-fuchsia-200 bg-fuchsia-50/60 p-4">
@@ -96,7 +101,7 @@ export default async function IssueOrderDetailPage({ params }: { params: Promise
             <span className="font-semibold">確定前の一覧確認</span>
             <span className="ml-2 text-xs text-slate-500">
               未出庫 {remaining} 件。<b>出庫指示リストを印刷</b>し、<b>ロケーション近い順</b>にピッキング。各明細の「照合出庫」で
-              <b>指示・商品ラベル・ロケラベルの3つのQR</b>を照合すると出荷可能になります。
+              <b>指示・品目ラベル・ロケラベルの3つのQR</b>を照合すると出荷可能になります。
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -203,7 +208,7 @@ export default async function IssueOrderDetailPage({ params }: { params: Promise
             {lines.length === 0 && (
               <tr>
                 <td colSpan={editable ? 8 : 7} className="px-4 py-8 text-center text-sm text-slate-400">
-                  明細がありません。上のフォームから商品を追加してください。
+                  明細がありません。上のフォームから品目を追加してください。
                 </td>
               </tr>
             )}

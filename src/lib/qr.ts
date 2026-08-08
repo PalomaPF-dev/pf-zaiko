@@ -1,6 +1,6 @@
 // ===== QRコード ペイロード ユーティリティ =====
 //
-// 商品QR = `${origin}/products/${図番}` 、ロケQR = `${origin}/locations/${ロケコード}`。
+// 品目QR = `${origin}/products/${図番}` 、ロケQR = `${origin}/locations/${ロケコード}`。
 // URL の末尾に「業務コード（図番／ロケコード）」を持たせることで、
 //  ・カメラアプリで読んでもブラウザで開ける（ディープリンク）
 //  ・ラベル印字・オフラインでも人間が目視照合できる
@@ -12,7 +12,7 @@ import { isLocCode } from "./location";
 
 export type QrBody = "url" | "code";
 
-/** 商品QRのペイロード文字列（code=在庫管理キー/商品CD/図番のいずれか）。 */
+/** 品目QRのペイロード文字列（code=在庫管理キー/品目CD/図番のいずれか）。 */
 export function productQrPayload(origin: string, code: string, body: QrBody = "url"): string {
   if (body === "code") return code;
   return `${origin}/products/${encodeURIComponent(code)}`;
@@ -45,9 +45,9 @@ export interface ScanResult {
 }
 
 /**
- * スキャン文字列を商品/ロケに解決する。
+ * スキャン文字列を品目/ロケに解決する。
  * 1) 自アプリURLならパス末尾を業務コードとして抽出
- * 2) URLでなければ、ロケ書式に一致すればロケ、それ以外は商品（図番）として扱う
+ * 2) URLでなければ、ロケ書式に一致すればロケ、それ以外は品目（図番）として扱う
  */
 export function resolveScan(text: string): ScanResult {
   const t = text.trim();
