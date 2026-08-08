@@ -133,6 +133,9 @@ async function buildSchema(): Promise<void> {
     )`);
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS item_master_company_name_idx ON item_master(company_id, name)`);
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS item_master_company_supplier_idx ON item_master(company_id, supplier_name)`);
+  // カタログからの削除（非表示）。役務・費用系など在庫管理に不要な品目を隠す。
+  // 行は消さないため W/F の新版取込（UPSERT）でも復活せず、「削除済み」フィルタから元に戻せる。
+  await safeDdl(() => sql`ALTER TABLE item_master ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT false`);
 
   // 品目カタログの取込履歴（会社ごとに1行）。version = 取込元スナップショットの基準日。
   // 同梱データの版と一致していれば取込済みとみなし、再取込をスキップする。

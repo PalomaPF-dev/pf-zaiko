@@ -43,7 +43,8 @@ export default async function ScanPage({
   const itemCode = notFoundCode ? normalizeItemCode(notFoundCode) : null;
   if (itemCode) {
     try {
-      unregisteredItem = await getItemMasterByCode(companyId, itemCode);
+      const found = await getItemMasterByCode(companyId, itemCode);
+      unregisteredItem = found && !found.hidden ? found : null;
     } catch (e) {
       console.error("[scan] 品目カタログの照会に失敗:", e);
     }

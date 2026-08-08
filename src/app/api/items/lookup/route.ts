@@ -35,6 +35,12 @@ export async function GET(req: Request) {
         { status: 404 }
       );
     }
+    if (item.hidden) {
+      return NextResponse.json(
+        { ok: false, message: `品目コード ${code} はカタログから削除されています（品目カタログの「削除済み」から戻せます）` },
+        { status: 404 }
+      );
+    }
     return NextResponse.json({
       ok: true,
       item: { ...item, unitLabel: itemUnitLabel(item.unitCode), packUnitLabel: itemUnitLabel(item.packUnitCode) },
