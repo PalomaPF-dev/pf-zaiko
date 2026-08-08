@@ -564,6 +564,69 @@ export async function getItemMasterByCode(
   return rows[0] ? mapItemMasterWithProduct(rows[0]) : null;
 }
 
+/** 品目コードの配列でカタログを引く（一括登録の対象確認用）。存在しないコードは結果に出ない。 */
+export async function getItemMastersByCodes(companyId: string, codes: string[]): Promise<ItemMaster[]> {
+  await ensureSchema();
+  if (codes.length === 0) return [];
+  const sql = getSql();
+  const rows = await sql`
+    SELECT * FROM item_master
+    WHERE company_id = ${companyId} AND code = ANY(${codes})
+    ORDER BY code`;
+  return rows.map(mapItemMaster);
+}
+
+/** 一括登録の1件（単位はカタログの単位コードから解決済み。未解決なら null＝既定の「個」） */
+export interface ItemToRegister {
+  code: string;
+  unit: string | null;
+}
+
+/**
+ * 資材W/F 品目カタログの指定コードを、品目マスタ（products）へ一括登録する。
+ *
+ * - 既に登録済み（products.drawing_no が同じコード）の品目は黙って飛ばす（何度押しても増えない）。
+ * - 在庫管理キー（ZK＋8桁連番）は既存の最大値から通しで採番する。1文で完結させるので、
+ *   件数分の往復も、採番の取り合いも起きない。
+ * - ロットサイズは products 側が INTEGER なので、整数のロット数だけ引き継ぐ。
+ *
+ * @returns 実際に登録した件数
+ */
+export async function bulkCreateProductsFromItems(
+  companyId: string,
+  entries: ItemToRegister[]
+): Promise<number> {
+  await ensureSchema();
+  if (entries.length === 0) return 0;
+  const sql = getSql();
+  const rows = await sql`
+    WITH input AS (
+      SELECT * FROM jsonb_to_recordset(${JSON.stringify(entries)}::jsonb) AS x(code TEXT, unit TEXT)
+    ), base AS (
+      SELECT COALESCE(MAX(NULLIF(regexp_replace(stock_key, '[^0-9]', '', 'g'), '')::bigint), 0) AS n
+      FROM products WHERE company_id = ${companyId} AND stock_key LIKE 'ZK%'
+    ), src AS (
+      SELECT i.code, i.name, i.supplier_name, i.lot_qty,
+             COALESCE(NULLIF(input.unit, ''), '個') AS unit,
+             row_number() OVER (ORDER BY i.code) AS rn
+      FROM input
+      JOIN item_master i ON i.company_id = ${companyId} AND i.code = input.code
+      WHERE NOT EXISTS (
+        SELECT 1 FROM products p WHERE p.company_id = ${companyId} AND p.drawing_no = i.code)
+    )
+    INSERT INTO products (company_id, drawing_no, name, unit, lot_size, supplier, stock_key, active)
+    SELECT ${companyId}, src.code, src.name, src.unit,
+           CASE WHEN src.lot_qty = trunc(src.lot_qty) AND src.lot_qty BETWEEN 1 AND 2147483647
+                THEN src.lot_qty::int END,
+           src.supplier_name,
+           'ZK' || lpad((base.n + src.rn)::text, 8, '0'),
+           true
+    FROM src CROSS JOIN base
+    ON CONFLICT DO NOTHING
+    RETURNING id`;
+  return rows.length;
+}
+
 /** 品目カタログの取込状況（未取込なら null）。 */
 export async function getItemMasterImport(companyId: string): Promise<ItemMasterImport | null> {
   await ensureSchema();

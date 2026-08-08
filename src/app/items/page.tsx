@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { ArrowLeft, BookMarked, Search } from "lucide-react";
+import { ArrowLeft, BookMarked, CheckCircle2, Search } from "lucide-react";
 import { requireAdminPage } from "@/lib/session";
 import { listItemMaster, getItemMasterImport } from "@/lib/db";
 import { ensureItemMasterSeeded, ITEM_MASTER_COUNT, ITEM_MASTER_VERSION } from "@/lib/itemMasterSeed";
 import { formatItemCode, itemUnitLabel } from "@/lib/itemCode";
-import { reimportItemMasterAction } from "@/lib/actions";
+import { bulkRegisterItemsAction, reimportItemMasterAction } from "@/lib/actions";
 import PageHeader from "@/components/PageHeader";
 import DbErrorState from "@/components/DbErrorState";
 import MasterTabs from "@/components/MasterTabs";
 import ConfirmForm from "@/components/ConfirmForm";
+import ItemBulkRegisterForm from "@/components/ItemBulkRegisterForm";
 
 export const dynamic = "force-dynamic";
 
@@ -22,13 +23,16 @@ function versionLabel(v: string): string {
 export default async function ItemsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; page?: string; only?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; only?: string; registered?: string; selected?: string }>;
 }) {
   const session = await requireAdminPage();
   const sp = await searchParams;
   const search = sp.q?.trim() || null;
   const unregisteredOnly = sp.only === "new";
   const page = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
+  // 一括登録直後のリダイレクトで結果を受け取る（registered=登録数 / selected=選択数）
+  const registered = sp.registered != null ? parseInt(sp.registered, 10) : null;
+  const selectedCount = sp.selected != null ? parseInt(sp.selected, 10) : null;
 
   let items, total, imported;
   try {
@@ -75,8 +79,23 @@ export default async function ItemsPage({
       </Link>
       <PageHeader
         title="資材W/F 品目カタログ"
-        description="資材W/F に登録されている品目の一覧です。品目コードで呼び出して、そのまま品目マスタへ登録できます。在庫は品目マスタ側で管理します。"
+        description="資材W/F に登録されている品目の一覧です。現物在庫として管理する品目だけをチェックして、品目マスタへ一括登録してください（保守・処理・運賃などの役務・費用系は登録不要です）。"
       />
+
+      {registered != null && Number.isFinite(registered) && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            {registered.toLocaleString()} 品目を品目マスタに登録しました。
+            {selectedCount != null && selectedCount > registered && (
+              <span className="ml-1 text-emerald-700/80">（{(selectedCount - registered).toLocaleString()} 品目は登録済みのためスキップ）</span>
+            )}
+            <Link href="/products" className="ml-2 font-semibold underline">
+              品目マスタを確認 →
+            </Link>
+          </span>
+        </div>
+      )}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
         <div className="text-slate-600">
@@ -137,10 +156,12 @@ export default async function ItemsPage({
             {total.toLocaleString()}件中 {((page - 1) * PAGE_SIZE + 1).toLocaleString()}〜
             {Math.min(page * PAGE_SIZE, total).toLocaleString()}件
           </p>
+          <ItemBulkRegisterForm action={bulkRegisterItemsAction} selectableCount={items.filter((it) => !it.productId).length}>
           <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-500">
+                  <th className="w-10 px-3 py-2.5"><span className="sr-only">選択</span></th>
                   <th className="whitespace-nowrap px-4 py-2.5">品目コード</th>
                   <th className="px-4 py-2.5">品名</th>
                   <th className="hidden whitespace-nowrap px-4 py-2.5 md:table-cell">仕入先</th>
@@ -152,6 +173,16 @@ export default async function ItemsPage({
               <tbody className="divide-y divide-slate-100">
                 {items.map((it) => (
                   <tr key={it.code} className={`hover:bg-slate-50 ${it.active ? "" : "opacity-50"}`}>
+                    <td className="px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        name="codes"
+                        value={it.code}
+                        disabled={it.productId != null}
+                        title={it.productId ? "登録済み" : "品目マスタに登録する"}
+                        className="h-4 w-4 rounded border-slate-300 text-fuchsia-600 focus:ring-fuchsia-500 disabled:opacity-30"
+                      />
+                    </td>
                     <td className="whitespace-nowrap px-4 py-2.5">
                       <Link href={`/items/${it.code}`} className="font-mono font-medium text-slate-800 hover:text-fuchsia-600">
                         {formatItemCode(it.code)}
@@ -189,6 +220,7 @@ export default async function ItemsPage({
               </tbody>
             </table>
           </div>
+          </ItemBulkRegisterForm>
 
           {lastPage > 1 && (
             <div className="mt-4 flex items-center justify-center gap-2 text-sm">

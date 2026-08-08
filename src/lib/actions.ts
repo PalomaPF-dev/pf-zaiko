@@ -66,10 +66,13 @@ import {
   addReceiptLine,
   deleteReceiptLine,
   putawayProduct,
+  bulkCreateProductsFromItems,
+  getItemMastersByCodes,
   type ProductInput,
   type PartnerInput,
 } from "./db";
 import { reimportItemMaster } from "./itemMasterSeed";
+import { itemUnitForProduct, normalizeItemCode } from "./itemCode";
 import { IO_TX_TYPES, PARTNER_KIND_LABEL, type TxType, type PartnerKind } from "./types";
 
 // ===== FormData ヘルパー =====
@@ -208,6 +211,42 @@ export async function reimportItemMasterAction(): Promise<void> {
   const { companyId } = await requireAdminSession();
   await reimportItemMaster(companyId);
   revalidatePath("/items");
+}
+
+/** 一度に登録できる上限。カタログ1ページ分（100件）を選び切っても余裕がある値。 */
+const BULK_REGISTER_LIMIT = 500;
+
+/**
+ * カタログで選択した品目を、品目マスタへ一括登録する（管理者のみ）。
+ * カタログは役務・費用系（保守・処理・運賃など）も含むため全件は入れず、
+ * 現物在庫を持つ品目だけを選んで登録してもらう前提。
+ * 登録済みのコードは自動で除外されるので、二重に押しても増えない。
+ */
+export async function bulkRegisterItemsAction(fd: FormData): Promise<void> {
+  const { companyId } = await requireAdminSession();
+  const codes = Array.from(
+    new Set(
+      fd
+        .getAll("codes")
+        .map((v) => normalizeItemCode(String(v)))
+        .filter((c): c is string => c != null)
+    )
+  );
+  if (codes.length === 0) redirect("/items");
+  if (codes.length > BULK_REGISTER_LIMIT) {
+    throw new Error(`一度に登録できるのは ${BULK_REGISTER_LIMIT} 品目までです`);
+  }
+
+  // 単位は W/F の単位コード表が判明しているものだけ引き継ぐ（不明なら既定の「個」）
+  const items = await getItemMastersByCodes(companyId, codes);
+  const created = await bulkCreateProductsFromItems(
+    companyId,
+    items.map((i) => ({ code: i.code, unit: itemUnitForProduct(i.unitCode) }))
+  );
+
+  revalidatePath("/items");
+  revalidatePath("/products");
+  redirect(`/items?registered=${created}&selected=${codes.length}`);
 }
 
 // ===== ロケーション =====
