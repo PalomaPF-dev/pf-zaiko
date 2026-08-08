@@ -60,8 +60,9 @@ async function buildSchema(): Promise<void> {
   await safeDdl(() => sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS is_pro BOOLEAN NOT NULL DEFAULT false`);
   await safeDdl(() => sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMPTZ`);
 
-  // アラート通知の宛先（カンマ区切り。未設定ならユーザー全員に送る）
-  await safeDdl(() => sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS notify_emails TEXT`);
+  // アラート通知の宛先はアプリ内に持たない（ポータル連携の承認者へ送る）。
+  // 旧・通知先設定の列は不要になったため削除する（設定画面・更新関数とも撤去済み）。
+  await safeDdl(() => sql`ALTER TABLE companies DROP COLUMN IF EXISTS notify_emails`);
   // 在庫不足時に出庫を許すか（既定 false=拒否）。先行出庫を許す現場のみ ON。
   await safeDdl(() => sql`ALTER TABLE companies ADD COLUMN IF NOT EXISTS allow_negative_stock BOOLEAN NOT NULL DEFAULT false`);
 

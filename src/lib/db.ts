@@ -1832,10 +1832,9 @@ export async function deletePartner(companyId: string, id: string): Promise<void
   await sql`DELETE FROM partners WHERE company_id = ${companyId} AND id = ${id}`;
 }
 
-// ===== 会社設定・通知先 =====
+// ===== 会社設定 =====
 
 export interface CompanySettings {
-  notifyEmails: string;
   allowNegative: boolean;
 }
 
@@ -1843,9 +1842,8 @@ export async function getCompanySettings(companyId: string): Promise<CompanySett
   await ensureSchema();
   const sql = getSql();
   const rows = await sql`
-    SELECT notify_emails, allow_negative_stock FROM companies WHERE id = ${companyId} LIMIT 1`;
+    SELECT allow_negative_stock FROM companies WHERE id = ${companyId} LIMIT 1`;
   return {
-    notifyEmails: rows[0]?.notify_emails ?? "",
     allowNegative: Boolean(rows[0]?.allow_negative_stock),
   };
 }
@@ -1860,18 +1858,92 @@ export async function updateAllowNegative(companyId: string, allow: boolean): Pr
   await sql`UPDATE companies SET allow_negative_stock = ${allow} WHERE id = ${companyId}`;
 }
 
-/** アラート通知の実際の宛先リスト。notify_emails 未設定なら会社のユーザー全員。 */
-export async function resolveNotifyRecipients(companyId: string): Promise<string[]> {
+// ===== アラート通知の宛先（ポータル連携の承認者） =====
+
+/**
+ * アラートの宛先＝**ポータルで承認者として指名されている人**。
+ * ポータルのユーザー設定で職場の管理者が既定の承認者として各アプリへ連携され、
+ * users.approver_login_id に入る。その login_id を持つユーザーのメールを宛先にする。
+ *
+ * factory を渡すと「その工場に所属する人の承認者」だけに絞る（工場ごとの通知用）。
+ * アプリ内に通知先の設定は持たないため、**該当者が居なければ空＝送信しない**
+ * （以前の「未設定ならユーザー全員へ送信」フォールバックは廃止）。
+ */
+export async function listApproverEmails(
+  companyId: string,
+  factory?: string | null
+): Promise<string[]> {
   await ensureSchema();
   const sql = getSql();
-  const setting = (await getCompanySettings(companyId)).notifyEmails;
-  const fromSetting = setting
-    .split(/[,\s]+/)
-    .map((s) => s.trim())
-    .filter((s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s));
-  if (fromSetting.length > 0) return fromSetting;
-  const rows = await sql`SELECT email FROM users WHERE company_id = ${companyId}`;
-  return rows.map((r: any) => r.email).filter(Boolean);
+  const f = factory ?? null;
+  const rows = await sql`
+    SELECT DISTINCT a.email
+    FROM users u
+    JOIN users a ON a.company_id = u.company_id AND a.login_id = u.approver_login_id
+    WHERE u.company_id = ${companyId}
+      AND u.approver_login_id IS NOT NULL
+      AND (${f}::text IS NULL OR u.factory = ${f})
+      AND a.email IS NOT NULL AND btrim(a.email) <> ''`;
+  return rows.map((r: any) => String(r.email).trim()).filter(Boolean);
+}
+
+/** 安全在庫割れの通知を、在庫が置かれている工場ごとにまとめたもの。 */
+export interface StockAlertGroup {
+  /** 工場名。null＝在庫がどの工場にも無い（在庫ゼロ等） */
+  factory: string | null;
+  items: {
+    drawingNo: string;
+    name: string;
+    totalQty: number;
+    safetyStock: number;
+    unit: string;
+  }[];
+}
+
+/**
+ * 安全在庫割れ品目を、**在庫が置かれている工場ごと**に振り分けて返す。
+ *
+ * 割れの判定は従来どおり会社全体の在庫合計と安全在庫の比較（工場別の安全在庫は無い）。
+ * そのうえで、その品目の在庫がある工場の担当者にだけ届くよう振り分ける。
+ * 在庫がどこにも無い品目は factory=null のグループにまとめ、全工場の承認者へ知らせる。
+ */
+export async function listBelowSafetyByFactory(companyId: string): Promise<StockAlertGroup[]> {
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    WITH totals AS (
+      SELECT p.id, p.drawing_no, p.name, p.unit, p.safety_stock,
+             COALESCE((SELECT SUM(st.qty) FROM stock st
+                       WHERE st.company_id = ${companyId} AND st.product_id = p.id), 0) AS total_qty
+      FROM products p
+      WHERE p.company_id = ${companyId} AND p.active = true AND p.safety_stock IS NOT NULL
+    ),
+    below AS (
+      SELECT * FROM totals WHERE total_qty < safety_stock
+    )
+    SELECT DISTINCT b.drawing_no, b.name, b.unit, b.safety_stock, b.total_qty, si.name AS factory
+    FROM below b
+    LEFT JOIN stock st ON st.company_id = ${companyId} AND st.product_id = b.id AND st.qty <> 0
+    LEFT JOIN locations lo ON lo.id = st.location_id
+    LEFT JOIN sites si ON si.id = lo.site_id
+    ORDER BY si.name NULLS LAST, b.name`;
+  const byFactory = new Map<string | null, StockAlertGroup>();
+  for (const r of rows as any[]) {
+    const factory = (r.factory as string | null) ?? null;
+    let g = byFactory.get(factory);
+    if (!g) {
+      g = { factory, items: [] };
+      byFactory.set(factory, g);
+    }
+    g.items.push({
+      drawingNo: String(r.drawing_no ?? ""),
+      name: String(r.name ?? ""),
+      totalQty: Number(r.total_qty ?? 0),
+      safetyStock: Number(r.safety_stock ?? 0),
+      unit: String(r.unit ?? ""),
+    });
+  }
+  return Array.from(byFactory.values());
 }
 
 // ===== 入荷（受入）／入庫（棚入れ） =====

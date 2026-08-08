@@ -788,7 +788,7 @@ export async function deletePartnerAction(id: string): Promise<void> {
 // ===== 設定 =====
 
 // 在庫アラートの通知先はアプリ内で設定しない（アカウント・宛先はポータルが正）。
-// 送信側 resolveNotifyRecipients は既存値があればそれを、無ければ登録ユーザー全員を宛先にする。
+// 送信側はポータル連携の承認者（職場の管理者）へ工場ごとに送る（listApproverEmails）。
 
 export async function updateAllowNegativeAction(fd: FormData): Promise<void> {
   const { companyId } = await requireAdminSession();
