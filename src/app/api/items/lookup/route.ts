@@ -7,7 +7,7 @@ import { itemUnitLabel, normalizeItemCode } from "@/lib/itemCode";
 export const dynamic = "force-dynamic";
 
 /**
- * 品目コードで品目マスタを1件引く（商品登録フォームの「呼び出す」用）。
+ * 品目コードで資材W/F 品目カタログを1件引く（品目登録フォームの「呼び出す」用）。
  * ハイフン付き・桁落ちの入力も normalizeItemCode で吸収する。
  */
 export async function GET(req: Request) {
@@ -31,7 +31,7 @@ export async function GET(req: Request) {
     const item = await getItemMasterByCode(session.companyId, code);
     if (!item) {
       return NextResponse.json(
-        { ok: false, message: `品目コード ${code} は品目マスタにありません` },
+        { ok: false, message: `品目コード ${code} は資材W/F 品目カタログにありません` },
         { status: 404 }
       );
     }

@@ -7,6 +7,8 @@ import { formatDateTime } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import { StocktakeStatusBadge } from "@/components/Badges";
 import DbErrorState from "@/components/DbErrorState";
+import ViewOnlySiteNotice from "@/components/ViewOnlySiteNotice";
+import { currentWorkplaceOperation } from "@/lib/workplace";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,7 @@ export default async function StocktakesPage() {
   const session = await requireEntitledSession();
 
   const { siteId } = await currentScope();
+  const { operable } = await currentWorkplaceOperation(session.companyId);
 
   let takes;
   try {
@@ -34,23 +37,29 @@ export default async function StocktakesPage() {
         title="棚卸"
         description="指示 → 記入リスト → 実棚入力 → 差異確認 → 在庫反映 の流れで棚卸します。"
         action={
-          <Link
-            href="/stocktakes/new"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700"
-          >
-            <Plus className="h-4 w-4" />
-            棚卸を開始
-          </Link>
+          operable ? (
+            <Link
+              href="/stocktakes/new"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700"
+            >
+              <Plus className="h-4 w-4" />
+              棚卸を開始
+            </Link>
+          ) : null
         }
       />
+
+      <ViewOnlySiteNotice companyId={session.companyId} />
 
       {takes.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
           <ClipboardCheck className="mx-auto mb-3 h-8 w-8 text-slate-300" />
           <p className="text-sm text-slate-500">棚卸はまだありません。</p>
-          <Link href="/stocktakes/new" className="mt-3 inline-block text-sm font-medium text-fuchsia-600 hover:underline">
-            棚卸を開始する
-          </Link>
+          {operable && (
+            <Link href="/stocktakes/new" className="mt-3 inline-block text-sm font-medium text-fuchsia-600 hover:underline">
+              棚卸を開始する
+            </Link>
+          )}
         </div>
       ) : (
         <div className="flex flex-col gap-3">

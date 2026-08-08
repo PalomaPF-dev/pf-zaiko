@@ -7,6 +7,8 @@ import { formatDate } from "@/lib/format";
 import { RECEIPT_STATUS_LABEL, type ReceiptStatus } from "@/lib/types";
 import PageHeader from "@/components/PageHeader";
 import DbErrorState from "@/components/DbErrorState";
+import ViewOnlySiteNotice from "@/components/ViewOnlySiteNotice";
+import { currentWorkplaceOperation } from "@/lib/workplace";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,8 @@ export default async function InboundPage() {
   const session = await requireEntitledSession();
 
   const { siteId } = await currentScope();
+  // 他工場の職場を見ているときは登録させない（閲覧のみ）
+  const { operable } = await currentWorkplaceOperation(session.companyId);
 
   let receipts;
   try {
@@ -38,25 +42,31 @@ export default async function InboundPage() {
     <div className="p-4 sm:p-6">
       <PageHeader
         title="入荷（受入）"
-        description="納入場所を指定し、商品マスタから検索して入荷を登録します。登録後に商品ラベルを発行・一覧をPDF化できます。ロケーションは次の「入庫（棚入れ）」で付与します。"
+        description="納入場所を指定し、品目マスタから検索して入荷を登録します。登録後に品目ラベルを発行・一覧をPDF化できます。ロケーションは次の「入庫（棚入れ）」で付与します。"
         action={
-          <Link
-            href="/inbound/new"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700"
-          >
-            <Plus className="h-4 w-4" />
-            新規入荷
-          </Link>
+          operable ? (
+            <Link
+              href="/inbound/new"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700"
+            >
+              <Plus className="h-4 w-4" />
+              新規入荷
+            </Link>
+          ) : null
         }
       />
+
+      <ViewOnlySiteNotice companyId={session.companyId} />
 
       {receipts.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
           <ArrowDownToLine className="mx-auto mb-3 h-8 w-8 text-slate-300" />
           <p className="text-sm text-slate-500">入荷（受入）はまだありません。</p>
-          <Link href="/inbound/new" className="mt-3 inline-block text-sm font-medium text-fuchsia-600 hover:underline">
-            最初の入荷を登録する
-          </Link>
+          {operable && (
+            <Link href="/inbound/new" className="mt-3 inline-block text-sm font-medium text-fuchsia-600 hover:underline">
+              最初の入荷を登録する
+            </Link>
+          )}
         </div>
       ) : (
         <div className="flex flex-col gap-3">

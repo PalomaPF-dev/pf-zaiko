@@ -2,12 +2,13 @@ import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { listPendingPutaway, listLocations } from "@/lib/db";
-import { resolveCurrentWorkplace } from "@/lib/workplace";
-import { currentScope } from "@/lib/scope";
+import { currentWorkplaceOperation } from "@/lib/workplace";
+import { currentOpScope } from "@/lib/scope";
 import { putawayAction } from "@/lib/actions";
 import PageHeader from "@/components/PageHeader";
 import DbErrorState from "@/components/DbErrorState";
 import NoWorkplaceState from "@/components/NoWorkplaceState";
+import ViewOnlySiteNotice from "@/components/ViewOnlySiteNotice";
 import PutawayForm, { type PutawayProduct, type PutawayLocation } from "@/components/PutawayForm";
 
 export const dynamic = "force-dynamic";
@@ -15,9 +16,9 @@ export const dynamic = "force-dynamic";
 export default async function PutawayPage() {
   const session = await requireEntitledSession();
 
-  let workplace, pending, locations;
+  let pending, locations;
   try {
-    workplace = await resolveCurrentWorkplace(session.companyId);
+    const { workplace, operable } = await currentWorkplaceOperation(session.companyId);
     if (!workplace) {
       return (
         <div className="p-4 sm:p-6">
@@ -26,8 +27,17 @@ export default async function PutawayPage() {
         </div>
       );
     }
-    // 棚入れ候補は自工場で受け入れた入荷分だけ
-    const { siteId } = await currentScope();
+    // 他工場の職場を見ているときは棚入れできない（閲覧のみ）
+    if (!operable) {
+      return (
+        <div className="mx-auto max-w-2xl p-4 sm:p-6">
+          <PageHeader title="入庫（棚入れ）" />
+          <ViewOnlySiteNotice companyId={session.companyId} />
+        </div>
+      );
+    }
+    // 棚入れ候補は入出庫できる工場で受け入れた入荷分だけ
+    const { siteId } = await currentOpScope();
     [pending, locations] = await Promise.all([
       listPendingPutaway(session.companyId, { siteId }),
       listLocations(session.companyId, { workplaceId: workplace.id }),
@@ -59,7 +69,7 @@ export default async function PutawayPage() {
     <div className="mx-auto max-w-2xl p-4 sm:p-6">
       <PageHeader
         title="入庫（棚入れ）"
-        description="①入荷で貼った商品ラベルをスキャン（または一覧から選択）し、ロケーションを付与して棚入れします。商品ごとに完結します。"
+        description="①入荷で貼った品目ラベルをスキャン（または一覧から選択）し、ロケーションを付与して棚入れします。品目ごとに完結します。"
       />
 
       {locs.length === 0 ? (

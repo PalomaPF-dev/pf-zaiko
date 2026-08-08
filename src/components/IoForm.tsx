@@ -211,7 +211,7 @@ function IoPanel({
       if (p) {
         setProductId(p.id);
         setScanMsg("");
-      } else setScanMsg(`図番「${r.code}」の商品が見つかりません`);
+      } else setScanMsg(`図番「${r.code}」の品目が見つかりません`);
     } else if (scanTarget === "fromLocation") {
       const l = locations.find((x) => x.code.toUpperCase() === r.code.toUpperCase());
       if (l) {
@@ -226,9 +226,9 @@ function IoPanel({
     <form action={formAction} className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
       <input type="hidden" name="txType" value={txType} />
 
-      {/* 商品 */}
+      {/* 品目 */}
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-600">商品（図番）</label>
+        <label className="mb-1 block text-sm font-medium text-slate-600">品目（図番）</label>
         <div className="flex gap-2">
           <select name="productId" required value={productId} onChange={(e) => setProductId(e.target.value)} className={input}>
             <option value="">選択してください</option>
@@ -344,7 +344,7 @@ function MovePanel({
   action: (fd: FormData) => Promise<ActionResult>;
 }) {
   const [productId, setProductId] = useState(defaultProductId ?? "");
-  // 移動元ロケ：商品を選ぶと在庫のあるロケ（在庫最多を既定）を自動選択
+  // 移動元ロケ：品目を選ぶと在庫のあるロケ（在庫最多を既定）を自動選択
   const stockCells = productId ? stockByProduct[productId] ?? [] : [];
   const [fromLocationId, setFromLocationId] = useState(stockCells[0]?.locationId ?? "");
   const [state, formAction, pending] = useActionState<ActionResult | null, FormData>(
@@ -355,14 +355,14 @@ function MovePanel({
 
   function handleProduct(pid: string) {
     setProductId(pid);
-    // その商品の在庫最多ロケを移動元に自動セット
+    // その品目の在庫最多ロケを移動元に自動セット
     setFromLocationId((stockByProduct[pid] ?? [])[0]?.locationId ?? "");
   }
 
   return (
     <form action={formAction} className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-600">商品（図番）</label>
+        <label className="mb-1 block text-sm font-medium text-slate-600">品目（図番）</label>
         <select name="productId" required value={productId} onChange={(e) => handleProduct(e.target.value)} className={input}>
           <option value="">選択してください</option>
           {products.map((p) => (
@@ -385,7 +385,7 @@ function MovePanel({
             disabled={!productId}
           >
             {!productId ? (
-              <option value="">先に商品を選択</option>
+              <option value="">先に品目を選択</option>
             ) : stockCells.length === 0 ? (
               <option value="">在庫のあるロケがありません</option>
             ) : (
@@ -397,7 +397,7 @@ function MovePanel({
             )}
           </select>
           {product && stockCells.length > 0 && (
-            <p className="mt-1 text-xs text-slate-400">商品を選ぶと在庫最多のロケを自動で選びます（変更可）。</p>
+            <p className="mt-1 text-xs text-slate-400">品目を選ぶと在庫最多のロケを自動で選びます（変更可）。</p>
           )}
         </div>
         <div>

@@ -22,7 +22,7 @@ export default async function NewProductPage({
     listPartners(companyId, { kind: "supplier", activeOnly: true }),
   ]);
 
-  // 品目マスタ（/items）から「この品目で商品を登録」で来たときは、その品目を初期値にする
+  // 資材W/F 品目カタログ（/items）から「品目マスタに登録」で来たときは、その品目を初期値にする
   let initialItem: ItemMasterLookup | null = null;
   const code = itemParam ? normalizeItemCode(itemParam) : null;
   if (code) {
@@ -45,14 +45,14 @@ export default async function NewProductPage({
   return (
     <div className="mx-auto max-w-2xl p-4 sm:p-6">
       <PageHeader
-        title="商品を登録"
+        title="品目を登録"
         description="登録後、ラベル発行・入出庫の対象になります。"
         action={
           <Link
             href="/items"
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
           >
-            品目マスタから探す
+            資材W/Fから探す
           </Link>
         }
       />

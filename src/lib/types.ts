@@ -58,12 +58,12 @@ export const TX_TYPE_LABEL: Record<TxType, string> = {
 /** 入出庫フォームで直接選べる区分（移動と棚卸差異はそれぞれ専用フローで作る） */
 export const IO_TX_TYPES: TxType[] = ["receipt", "issue", "adjust"];
 
-/** 商品（マスタ。QRラベルの親） */
+/** 品目（マスタ。QRラベルの親） */
 export interface Product {
   id: string;
   companyId: string;
   drawingNo: string; // 図番（会社内一意。図面との紐付けキー）
-  productCode: string | null; // 商品CD（社内の商品コード）
+  productCode: string | null; // 品目CD（社内コード。資材W/F の品目コードは drawingNo 側）
   stockKey: string | null; // 在庫管理キー（ZK+番号。QR/ピッキングの追跡キー）
   name: string; // 品名
   spec: string | null; // 規格・型式
@@ -80,14 +80,14 @@ export interface Product {
   updatedAt: string;
 }
 
-/** QR・ラベルに載せる商品コード（副資材=メーカー品番を最優先→在庫管理キー→商品CD→図番）。 */
+/** QR・ラベルに載せるコード（副資材=メーカー品番を最優先→在庫管理キー→品目CD→図番）。 */
 export function productLabelCode(
   p: Pick<Product, "stockKey" | "productCode" | "drawingNo"> & { makerCode?: string | null },
 ): string {
   return p.makerCode || p.stockKey || p.productCode || p.drawingNo || "";
 }
 
-/** 商品＋現在庫合計（一覧・ラベル表示用） */
+/** 品目＋現在庫合計（一覧・ラベル表示用） */
 export interface ProductWithStock extends Product {
   totalQty: number; // 全ロケ合計の現在庫
   locationCount: number; // 在庫のあるロケ数
@@ -95,8 +95,8 @@ export interface ProductWithStock extends Product {
 }
 
 /**
- * 品目マスタの1件（資材W/F から取り込んだ参照カタログ）。
- * 在庫は持たない。品目コードで呼び出して商品（Product）を起こすための元データ。
+ * 資材W/F 品目カタログの1件（参照専用。在庫は持たない）。
+ * 在庫は持たない。品目コードで呼び出して品目（Product）を起こすための元データ。
  * 数量系は W/F の値をそのまま持つため小数がありうる（在庫数の integer とは別物）。
  */
 export interface ItemMaster {
@@ -118,9 +118,9 @@ export interface ItemMaster {
   active: boolean; // 取込時点で有効な品目か
 }
 
-/** 品目マスタ＋在庫アプリ側の登録状況（一覧・呼び出し用） */
+/** 品目カタログ＋品目マスタへの登録状況（一覧・呼び出し用） */
 export interface ItemMasterWithProduct extends ItemMaster {
-  productId: string | null; // 商品として登録済みならその ID（未登録なら null）
+  productId: string | null; // 品目として登録済みならその ID（未登録なら null）
 }
 
 /** 品目コード呼び出し（/api/items/lookup）のレスポンス。単位コードは表示名に解決済み。 */
@@ -129,7 +129,7 @@ export interface ItemMasterLookup extends ItemMasterWithProduct {
   packUnitLabel: string;
 }
 
-/** 品目マスタの取込状況（会社ごと） */
+/** 品目カタログの取込状況（会社ごと） */
 export interface ItemMasterImport {
   version: string; // 取込元スナップショットの基準日（YYYYMMDD）
   itemCount: number;
@@ -162,11 +162,11 @@ export interface Location {
 
 /** ロケーション＋在庫サマリ（一覧表示用） */
 export interface LocationWithStock extends Location {
-  productCount: number; // このロケに在庫がある商品数
+  productCount: number; // このロケに在庫がある品目数
   totalQty: number; // このロケの在庫合計
 }
 
-/** 在庫台帳の1行（商品×ロケ×数量） */
+/** 在庫台帳の1行（品目×ロケ×数量） */
 export interface StockRow {
   id: string;
   productId: string;
@@ -175,7 +175,7 @@ export interface StockRow {
   updatedAt: string;
 }
 
-/** 在庫台帳（商品・ロケ情報を JOIN 済み） */
+/** 在庫台帳（品目・ロケ情報を JOIN 済み） */
 export interface StockWithMeta extends StockRow {
   drawingNo: string;
   makerCode: string | null;
@@ -204,7 +204,7 @@ export interface Transaction {
   createdAt: string;
 }
 
-/** 受払照会用（商品・ロケ情報を JOIN 済み） */
+/** 受払照会用（品目・ロケ情報を JOIN 済み） */
 export interface TransactionWithMeta extends Transaction {
   drawingNo: string;
   makerCode: string | null;
@@ -241,7 +241,7 @@ export interface StocktakeWithProgress extends Stocktake {
   diffCount: number; // 差異のある行数（counted 済みのうち diff != 0）
 }
 
-/** 棚卸明細（商品×ロケ 1行） */
+/** 棚卸明細（品目×ロケ 1行） */
 export interface StocktakeLine {
   id: string;
   stocktakeId: string;
@@ -254,7 +254,7 @@ export interface StocktakeLine {
   countedAt: string | null;
 }
 
-/** 棚卸明細＋商品・ロケ情報（入力・印刷用） */
+/** 棚卸明細＋品目・ロケ情報（入力・印刷用） */
 export interface StocktakeLineWithMeta extends StocktakeLine {
   drawingNo: string;
   productName: string;
@@ -313,7 +313,7 @@ export interface IssueOrderWithProgress extends IssueOrder {
   issuedCount: number; // 出庫完了した明細数
 }
 
-/** 出庫指示 明細（商品×引当ロケ×数量） */
+/** 出庫指示 明細（品目×引当ロケ×数量） */
 export interface IssueOrderLine {
   id: string;
   orderId: string;
@@ -326,7 +326,7 @@ export interface IssueOrderLine {
   qtyIssued: number; // 実出庫数
 }
 
-/** 出庫指示 明細＋商品・ロケ情報（ピッキングリスト用） */
+/** 出庫指示 明細＋品目・ロケ情報（ピッキングリスト用） */
 export interface IssueOrderLineWithMeta extends IssueOrderLine {
   drawingNo: string;
   productCode: string | null;
@@ -364,13 +364,13 @@ export interface ReceiptWithProgress extends Receipt {
   totalQty: number; // 受入合計
 }
 
-/** 受入明細（商品×受入数。未入庫 = qty - qtyPutaway） */
+/** 受入明細（品目×受入数。未入庫 = qty - qtyPutaway） */
 export interface ReceiptLine {
   id: string;
   receiptId: string;
   seq: number;
   productId: string;
-  supplier: string | null; // 仕入先（受入時の商品マスタからのスナップショット）
+  supplier: string | null; // 仕入先（受入時の品目マスタからのスナップショット）
   perBox: number | null; // 入り数（1箱あたり）
   boxCount: number | null; // 箱数
   qty: number; // 合計受入数
@@ -379,7 +379,7 @@ export interface ReceiptLine {
   labelPrinted: boolean;
 }
 
-/** 受入明細＋商品情報（明細表示・ラベル発行用） */
+/** 受入明細＋品目情報（明細表示・ラベル発行用） */
 export interface ReceiptLineWithMeta extends ReceiptLine {
   drawingNo: string;
   productCode: string | null;
@@ -389,7 +389,7 @@ export interface ReceiptLineWithMeta extends ReceiptLine {
   lotSize: number | null;
 }
 
-/** 未入庫（棚入れ待ち）を商品ごとに集計した1行（②入庫の候補） */
+/** 未入庫（棚入れ待ち）を品目ごとに集計した1行（②入庫の候補） */
 export interface PendingPutaway {
   productId: string;
   drawingNo: string;
@@ -412,5 +412,5 @@ export interface DashboardCounts {
   todayTxCount: number;
   openStocktakeCount: number;
   openIssueOrderCount: number;
-  pendingPutawayCount: number; // 未入庫（棚入れ待ち）の商品件数
+  pendingPutawayCount: number; // 未入庫（棚入れ待ち）の品目件数
 }

@@ -52,7 +52,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ cod
       <MasterTabs />
       <Link href="/items" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700">
         <ArrowLeft className="h-4 w-4" />
-        品目マスタ
+        資材W/F 品目カタログ
       </Link>
       <PageHeader
         title={item.name}
@@ -63,7 +63,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ cod
               href={`/products/${item.productId}`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
             >
-              登録済みの商品を開く
+              品目マスタを開く
             </Link>
           ) : (
             <Link
@@ -71,7 +71,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ cod
               className="inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700"
             >
               <PackagePlus className="h-4 w-4" />
-              この品目で商品を登録
+              品目マスタに登録
             </Link>
           )
         }
@@ -108,8 +108,8 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ cod
       </dl>
 
       <p className="mt-4 text-xs text-slate-400">
-        品目マスタは資材W/F から取り込んだ参照用の一覧です。在庫は持ちません。
-        入出庫の対象にするには「この品目で商品を登録」から商品マスタへ登録してください（品目コードがそのまま図番になり、
+        資材W/F 品目カタログは W/F から取り込んだ参照用の一覧です。在庫は持ちません。
+        入出庫の対象にするには「品目マスタに登録」から登録してください（品目コードがそのまま図番になり、
         スキャン・手入力で呼び出せます）。
       </p>
     </div>

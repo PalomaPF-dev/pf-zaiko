@@ -10,7 +10,7 @@ import type { ActionResult } from "@/lib/actions";
 const input =
   "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-1 focus:ring-fuchsia-500";
 
-/** 品目マスタから引き継げる商品マスタの初期値。値が無い項目は undefined（既定値を潰さない）。 */
+/** 資材W/F 品目カタログから引き継げる品目マスタの初期値。値が無い項目は undefined（既定値を潰さない）。 */
 interface ProductDefaults {
   name?: string;
   drawingNo?: string;
@@ -19,7 +19,7 @@ interface ProductDefaults {
   lotSize?: string;
 }
 
-/** 品目マスタ → 商品マスタの初期値（ロットサイズは整数のときだけ引き継ぐ）。 */
+/** 品目カタログ → 品目マスタの初期値（ロットサイズは整数のときだけ引き継ぐ）。 */
 function itemDefaults(item: ItemMasterLookup | null): ProductDefaults {
   if (!item) return {};
   return {
@@ -41,11 +41,11 @@ function fillForm(form: HTMLFormElement, item: ItemMasterLookup) {
 }
 
 /**
- * 商品（マスタ）の登録/編集フォーム（Server Action を受け取る）。
- * 図番・商品CD・在庫管理キーの重複などの失敗は、全画面エラーにせず
+ * 品目（マスタ）の登録/編集フォーム（Server Action を受け取る）。
+ * 図番・品目CD・在庫管理キーの重複などの失敗は、全画面エラーにせず
  * フォーム上に日本語でインライン表示し、入力値をそのまま保持する。
  *
- * 新規登録では冒頭に「品目コードから呼び出す」欄を出し、資材W/F 由来の品目マスタから
+ * 新規登録では冒頭に「品目コードから呼び出す」欄を出し、資材W/F 由来の品目カタログから
  * 品名・図番（＝品目コード）・購入先・ロットサイズを引き当てて初期値にできる。
  */
 export default function ProductForm({
@@ -76,7 +76,7 @@ export default function ProductForm({
   const [looking, setLooking] = useState(false);
   const defaults = itemDefaults(initialItem);
 
-  /** 品目コードで品目マスタを引き、見つかればフォームへ流し込む。 */
+  /** 品目コードで資材W/F 品目カタログを引き、見つかればフォームへ流し込む。 */
   async function onLookup() {
     const form = formRef.current;
     const codeInput = form?.elements.namedItem("itemCode");
@@ -115,7 +115,7 @@ export default function ProductForm({
         setBusy(false);
         return;
       }
-      // 成功したら商品詳細へ（クライアント遷移。フォームはリセットしない）
+      // 成功したら品目詳細へ（クライアント遷移。フォームはリセットしない）
       if (res.id) {
         router.push(`/products/${res.id}`);
         router.refresh();
@@ -131,7 +131,7 @@ export default function ProductForm({
 
   return (
     <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-4">
-      {/* 品目コードから呼び出す（資材W/F の品目マスタ） */}
+      {/* 品目コードから呼び出す（資材W/F 品目カタログ） */}
       {itemLookup && (
         <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/50 p-4">
           <label className="mb-1 block text-sm font-semibold text-slate-700">品目コードから呼び出す</label>
@@ -184,7 +184,7 @@ export default function ProductForm({
               {item.altSuppliers && <p className="mt-1 text-slate-400">併用仕入先: {item.altSuppliers}</p>}
               {item.productId && (
                 <p className="mt-2 text-amber-700">
-                  この品目は既に商品として登録されています。重複登録にご注意ください。
+                  この品目は既に品目マスタに登録されています。重複登録にご注意ください。
                 </p>
               )}
             </div>
@@ -281,7 +281,7 @@ export default function ProductForm({
         <div className="flex flex-col gap-4">
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-600">図番・品目コード</label>
+              <label className="mb-1 block text-sm font-medium text-slate-600">図番（資材W/F 品目コード）</label>
               <input
                 name="drawingNo"
                 defaultValue={product?.drawingNo ?? defaults.drawingNo ?? ""}
@@ -293,7 +293,7 @@ export default function ProductForm({
               </p>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-600">商品CD</label>
+              <label className="mb-1 block text-sm font-medium text-slate-600">品目CD</label>
               <input name="productCode" defaultValue={product?.productCode ?? ""} placeholder="12345678" className={`${input} font-mono`} />
             </div>
             <div>
@@ -348,7 +348,7 @@ export default function ProductForm({
             defaultChecked={product.active}
             className="h-4 w-4 rounded border-slate-300 text-fuchsia-600 focus:ring-fuchsia-500"
           />
-          この商品を有効にする（外すと一覧の既定表示から除外）
+          この品目を有効にする（外すと一覧の既定表示から除外）
         </label>
       )}
       {error && (

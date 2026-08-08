@@ -38,19 +38,19 @@ export default async function ScanPage({
   const { notfound } = await searchParams;
   const notFoundCode = (notfound ?? "").trim().slice(0, 100);
 
-  // 商品として未登録でも、資材W/F の品目マスタに在れば「どの品目か」までは案内できる
+  // 品目マスタに未登録でも、資材W/F 品目カタログに在れば「どの品目か」までは案内できる
   let unregisteredItem = null;
   const itemCode = notFoundCode ? normalizeItemCode(notFoundCode) : null;
   if (itemCode) {
     try {
       unregisteredItem = await getItemMasterByCode(companyId, itemCode);
     } catch (e) {
-      console.error("[scan] 品目マスタの照会に失敗:", e);
+      console.error("[scan] 品目カタログの照会に失敗:", e);
     }
   }
   return (
     <div className="mx-auto max-w-md p-4 sm:p-6">
-      <PageHeader title="スキャン" description="QRを読むと、商品なら在庫画面、ロケなら在庫照会が開きます。" />
+      <PageHeader title="スキャン" description="QRを読むと、品目なら在庫画面、ロケなら在庫照会が開きます。" />
 
       <InventoryQrScanner />
 
@@ -59,23 +59,23 @@ export default async function ScanPage({
           <Search className="h-4 w-4" />
           手入力で開く
         </h2>
-        <p className="mb-3 text-xs text-slate-400">カメラが使えないときは、図番（例 ZU-A102-03）・商品CD・在庫管理キー・ロケ番号（例 A-01-3-2）を入力してください。</p>
+        <p className="mb-3 text-xs text-slate-400">カメラが使えないときは、図番（例 ZU-A102-03）・品目CD・在庫管理キー・ロケ番号（例 A-01-3-2）を入力してください。</p>
         {notFoundCode && (
           <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            「{notFoundCode}」に一致する商品・ロケが見つかりません。入力内容をご確認ください。
+            「{notFoundCode}」に一致する品目・ロケが見つかりません。入力内容をご確認ください。
             {unregisteredItem && (
               <p className="mt-2 border-t border-amber-200 pt-2">
-                資材W/F の品目マスタには
+                資材W/F 品目カタログには
                 <b className="mx-1">
                   {formatItemCode(unregisteredItem.code)} {unregisteredItem.name}
                 </b>
-                があります（商品マスタは未登録）。
+                があります（品目マスタは未登録）。
                 {role === "admin" ? (
                   <Link href={`/items/${unregisteredItem.code}`} className="ml-1 font-semibold underline">
-                    商品として登録する →
+                    品目として登録する →
                   </Link>
                 ) : (
-                  <span className="ml-1">管理者に商品マスタへの登録をご依頼ください。</span>
+                  <span className="ml-1">管理者に品目マスタへの登録をご依頼ください。</span>
                 )}
               </p>
             )}

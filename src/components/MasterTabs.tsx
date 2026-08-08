@@ -2,25 +2,26 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Package, BookMarked, Factory, MapPin, Contact, SlidersHorizontal } from "lucide-react";
+import { Package, Factory, MapPin, Contact, SlidersHorizontal } from "lucide-react";
 
 const TABS = [
-  { href: "/products", label: "商品マスタ", icon: Package },
-  { href: "/items", label: "品目マスタ", icon: BookMarked },
+  // 資材W/F 品目カタログ（/items）は品目マスタの呼び出し元なので、タブは分けず /products 側に含める
+  { href: "/products", label: "品目マスタ", icon: Package, also: ["/items"] },
   { href: "/sites", label: "工場・職場", icon: Factory },
   { href: "/locations", label: "ロケーション", icon: MapPin },
   { href: "/partners", label: "取引先", icon: Contact },
   { href: "/settings", label: "設定", icon: SlidersHorizontal },
 ];
 
-/** マスタ設定のヘッダータブ（商品／ロケーション／取引先／設定を横断切替）。 */
+/** マスタ設定のヘッダータブ（品目／工場職場／ロケーション／取引先／設定を横断切替）。 */
 export default function MasterTabs() {
   const pathname = usePathname();
+  const isUnder = (href: string) => pathname === href || pathname.startsWith(href + "/");
   return (
-    // モバイルでは2行に折り返して4タブすべてを見せる（横スクロールで「設定」が隠れるのを防ぐ）
+    // モバイルでは2行に折り返して全タブを見せる（横スクロールで「設定」が隠れるのを防ぐ）
     <div className="mb-5 flex flex-wrap gap-1 border-b border-slate-200">
       {TABS.map((t) => {
-        const active = pathname === t.href || pathname.startsWith(t.href + "/");
+        const active = isUnder(t.href) || (t.also ?? []).some(isUnder);
         return (
           <Link
             key={t.href}

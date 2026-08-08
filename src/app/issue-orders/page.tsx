@@ -7,6 +7,8 @@ import { formatDate } from "@/lib/format";
 import { ISSUE_ORDER_STATUS_LABEL, type IssueOrderStatus } from "@/lib/types";
 import PageHeader from "@/components/PageHeader";
 import DbErrorState from "@/components/DbErrorState";
+import ViewOnlySiteNotice from "@/components/ViewOnlySiteNotice";
+import { currentWorkplaceOperation } from "@/lib/workplace";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,7 @@ export default async function IssueOrdersPage() {
   const session = await requireEntitledSession();
 
   const { siteId } = await currentScope();
+  const { operable } = await currentWorkplaceOperation(session.companyId);
 
   let orders;
   try {
@@ -41,23 +44,29 @@ export default async function IssueOrdersPage() {
         title="出庫"
         description="出庫する部材を明細に追加し、確定前に一覧（出庫指示リスト）で確認・印刷してから出庫します。"
         action={
-          <Link
-            href="/issue-orders/new"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700"
-          >
-            <Plus className="h-4 w-4" />
-            新規出庫
-          </Link>
+          operable ? (
+            <Link
+              href="/issue-orders/new"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700"
+            >
+              <Plus className="h-4 w-4" />
+              新規出庫
+            </Link>
+          ) : null
         }
       />
+
+      <ViewOnlySiteNotice companyId={session.companyId} />
 
       {orders.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
           <Truck className="mx-auto mb-3 h-8 w-8 text-slate-300" />
           <p className="text-sm text-slate-500">出庫はまだありません。</p>
-          <Link href="/issue-orders/new" className="mt-3 inline-block text-sm font-medium text-fuchsia-600 hover:underline">
-            最初の出庫を作成する
-          </Link>
+          {operable && (
+            <Link href="/issue-orders/new" className="mt-3 inline-block text-sm font-medium text-fuchsia-600 hover:underline">
+              最初の出庫を作成する
+            </Link>
+          )}
         </div>
       ) : (
         <div className="flex flex-col gap-3">

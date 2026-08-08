@@ -7,7 +7,7 @@ const input =
 
 /**
  * 箱単位の数量入力：箱数 × 入り数 = 合計 を自動計算。
- * 入り数は商品マスタのロットサイズ（perBoxDefault）を既定にし編集可。合計は直接入力も可。
+ * 入り数は品目マスタのロットサイズ（perBoxDefault）を既定にし編集可。合計は直接入力も可。
  * フォーム送信フィールド：perBox / boxCount / <qtyName>（既定 "qty"）。
  */
 export default function BoxQtyInput({

@@ -95,7 +95,7 @@ export default async function ReceiptTagPage({ params }: { params: Promise<{ txI
         <div className="rtag">
           <div className="nm">{product.name}</div>
           <div className="cdrow">
-            <span className="cd">商品CD:{product.productCode ?? product.drawingNo}</span>
+            <span className="cd">品目CD:{product.productCode ?? product.drawingNo}</span>
             <span className="date">{formatDate(tx.createdAt)}</span>
           </div>
           <div className="mid">

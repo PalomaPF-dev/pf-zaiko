@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookMarked, Search } from "lucide-react";
+import { ArrowLeft, BookMarked, Search } from "lucide-react";
 import { requireAdminPage } from "@/lib/session";
 import { listItemMaster, getItemMasterImport } from "@/lib/db";
 import { ensureItemMasterSeeded, ITEM_MASTER_COUNT, ITEM_MASTER_VERSION } from "@/lib/itemMasterSeed";
@@ -32,7 +32,7 @@ export default async function ItemsPage({
 
   let items, total, imported;
   try {
-    // 初回アクセス時に同梱データ（資材W/F の品目マスタ）をこの会社へ取り込む
+    // 初回アクセス時に同梱データ（資材W/F の品目カタログ）をこの会社へ取り込む
     await ensureItemMasterSeeded(session.companyId);
     [{ items, total }, imported] = await Promise.all([
       listItemMaster(session.companyId, {
@@ -47,7 +47,7 @@ export default async function ItemsPage({
     console.error("[items]", e);
     return (
       <div className="p-4 sm:p-6">
-        <PageHeader title="品目マスタ" />
+        <PageHeader title="資材W/F 品目カタログ" />
         <DbErrorState />
       </div>
     );
@@ -69,9 +69,13 @@ export default async function ItemsPage({
   return (
     <div className="p-4 sm:p-6">
       <MasterTabs />
+      <Link href="/products" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700">
+        <ArrowLeft className="h-4 w-4" />
+        品目マスタ
+      </Link>
       <PageHeader
-        title="品目マスタ"
-        description="資材W/F に登録されている品目の一覧です。品目コードで呼び出して、そのまま商品マスタに登録できます。"
+        title="資材W/F 品目カタログ"
+        description="資材W/F に登録されている品目の一覧です。品目コードで呼び出して、そのまま品目マスタへ登録できます。在庫は品目マスタ側で管理します。"
       />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm">
@@ -82,7 +86,7 @@ export default async function ItemsPage({
         {imported?.version !== ITEM_MASTER_VERSION && (
           <ConfirmForm
             action={reimportItemMasterAction}
-            message={`資材W/F の品目マスタ（${versionLabel(ITEM_MASTER_VERSION)}・${ITEM_MASTER_COUNT.toLocaleString()}品目）を取り込みます。よろしいですか？`}
+            message={`資材W/F の品目カタログ（${versionLabel(ITEM_MASTER_VERSION)}・${ITEM_MASTER_COUNT.toLocaleString()}品目）を取り込みます。よろしいですか？`}
             className="inline"
           >
             <button className="rounded-lg bg-fuchsia-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-fuchsia-700">
@@ -116,7 +120,7 @@ export default async function ItemsPage({
               : "border-slate-300 text-slate-600 hover:bg-slate-50"
           }`}
         >
-          商品未登録のみ
+          未登録のみ
         </Link>
       </div>
 
@@ -124,7 +128,7 @@ export default async function ItemsPage({
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
           <BookMarked className="mx-auto mb-3 h-8 w-8 text-slate-300" />
           <p className="text-sm text-slate-500">
-            {search || unregisteredOnly ? "該当する品目がありません。" : "品目マスタがまだ取り込まれていません。"}
+            {search || unregisteredOnly ? "該当する品目がありません。" : "品目カタログがまだ取り込まれていません。"}
           </p>
         </div>
       ) : (
@@ -142,7 +146,7 @@ export default async function ItemsPage({
                   <th className="hidden whitespace-nowrap px-4 py-2.5 md:table-cell">仕入先</th>
                   <th className="hidden whitespace-nowrap px-4 py-2.5 text-right sm:table-cell">入数</th>
                   <th className="hidden whitespace-nowrap px-4 py-2.5 text-right sm:table-cell">ロット数</th>
-                  <th className="whitespace-nowrap px-4 py-2.5 text-right">商品</th>
+                  <th className="whitespace-nowrap px-4 py-2.5 text-right">品目マスタ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -176,7 +180,7 @@ export default async function ItemsPage({
                           href={`/products/new?item=${it.code}`}
                           className="text-xs font-semibold text-fuchsia-600 hover:underline"
                         >
-                          商品に登録
+                          登録する
                         </Link>
                       )}
                     </td>

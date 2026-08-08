@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * 安全在庫割れの日次アラート（Vercel Cron から毎日呼ばれる）。
- * 各会社の安全在庫割れ商品を集計し、通知先へメール送信する。
+ * 各会社の安全在庫割れ品目を集計し、通知先へメール送信する。
  * CRON_SECRET が設定されている場合は Authorization: Bearer で認証（Vercel Cron が自動付与）。
  */
 export async function GET(req: Request) {

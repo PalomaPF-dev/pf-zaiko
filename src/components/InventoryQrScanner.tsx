@@ -9,7 +9,7 @@ import { resolveScan } from "@/lib/qr";
 const REGION_ID = "qr-reader-region";
 
 /**
- * QRカメラ（在庫用）。商品QR→商品詳細、ロケQR→ロケ照会 へ遷移する。
+ * QRカメラ（在庫用）。品目QR→品目詳細、ロケQR→ロケ照会 へ遷移する。
  * onResult を渡すと遷移せずコード（{kind, code}）をコールバック（入出庫フォームのスキャン充填用）。
  */
 export default function InventoryQrScanner({

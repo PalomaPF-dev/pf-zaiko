@@ -52,7 +52,7 @@ export default async function PickingListPage({ params }: { params: Promise<{ id
     );
   }
 
-  // 各行のQR＝在庫管理キー（無ければ商品CD/図番）。ヘッダQR＝出庫指示No。
+  // 各行のQR＝在庫管理キー（無ければ品目CD/図番）。ヘッダQR＝出庫指示No。
   const lineKey = (l: (typeof lines)[number]) => productLabelCode(l);
   const qrMap = await buildQrDataUrls(
     [...lines.map(lineKey), order.orderNo],
@@ -112,7 +112,7 @@ export default async function PickingListPage({ params }: { params: Promise<{ id
         </div>
       </div>
       <p className="mb-2 text-[10px] text-slate-500">
-        ※ <b>ロケーションが近い順</b>に並んでいます。各行のQR（在庫管理キー）と、<b>現物の商品ラベル</b>・<b>棚のロケーションQR</b>を照合してから出庫してください。
+        ※ <b>ロケーションが近い順</b>に並んでいます。各行のQR（在庫管理キー）と、<b>現物の品目ラベル</b>・<b>棚のロケーションQR</b>を照合してから出庫してください。
       </p>
 
       {/* ===== 明細 ===== */}
@@ -122,9 +122,9 @@ export default async function PickingListPage({ params }: { params: Promise<{ id
             <th style={{ width: "16mm" }}>予定行No<br />QR</th>
             <th style={{ width: "34mm", textAlign: "left" }}>ロケ</th>
             <th style={{ textAlign: "left" }}>
-              商品名 / ロットNo
+              品目名 / ロットNo
               <br />
-              商品CD・在庫管理キー
+              品目CD・在庫管理キー
             </th>
             <th style={{ width: "18mm" }}>入荷日</th>
             <th style={{ width: "20mm" }}>

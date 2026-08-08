@@ -15,12 +15,13 @@ import {
 } from "lucide-react";
 import { requireEntitledSession } from "@/lib/session";
 import { listStock, listTransactions, listStocktakes, listSites, listPendingPutaway, listIssueOrders } from "@/lib/db";
-import { resolveCurrentWorkplace } from "@/lib/workplace";
+import { currentWorkplaceOperation } from "@/lib/workplace";
 import { currentScope } from "@/lib/scope";
 import { formatDateTime, todayJST } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import { TxTypeBadge } from "@/components/Badges";
 import DbErrorState from "@/components/DbErrorState";
+import ViewOnlySiteNotice from "@/components/ViewOnlySiteNotice";
 import NoWorkplaceState from "@/components/NoWorkplaceState";
 
 export const dynamic = "force-dynamic";
@@ -31,12 +32,14 @@ export default async function DashboardPage() {
   // 工場スコープ（一般・作業者は自工場のみ。管理者・工場未設定は全工場）
   const { scope, siteId } = await currentScope();
 
-  let workplace, sites, stock, todaysTx, stocktakes, pending, orders;
+  let workplace, operable, sites, stock, todaysTx, stocktakes, pending, orders;
   try {
-    [workplace, sites] = await Promise.all([
-      resolveCurrentWorkplace(session.companyId),
+    const [op, siteRows] = await Promise.all([
+      currentWorkplaceOperation(session.companyId),
       listSites(session.companyId, { siteId }),
     ]);
+    ({ workplace, operable } = op);
+    sites = siteRows;
     if (workplace) {
       [stock, todaysTx, stocktakes, pending, orders] = await Promise.all([
         listStock(session.companyId, { workplaceId: workplace.id, nonZeroOnly: false }),
@@ -81,7 +84,7 @@ export default async function DashboardPage() {
           </p>
           <ol className="mt-3 space-y-2">
             <SetupStep done={sites.length > 0} label="① 工場・職場を登録する" description="工場を作り、その中に職場を登録します（在庫は職場ごとに独立）" href="/sites" linkLabel="工場・職場へ" />
-            <SetupStep done={false} label="② 副資材を登録する" description="品名とメーカー品番で商品マスタに登録します" href="/products/new" linkLabel="副資材を登録" />
+            <SetupStep done={false} label="② 副資材を登録する" description="品名とメーカー品番で品目マスタに登録します" href="/products/new" linkLabel="副資材を登録" />
             <SetupStep done={false} label="③ ロケーションを作成する" description="職場の中に棚位置（エリア-棚-段-間口）を登録します" href="/locations/new" linkLabel="ロケを作成" />
           </ol>
         </section>
@@ -105,15 +108,19 @@ export default async function DashboardPage() {
         title="ダッシュボード"
         description={`${session.companyName} の副資材在庫`}
         action={
-          <Link
-            href="/inbound"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700"
-          >
-            <ArrowDownToLine className="h-4 w-4" />
-            入荷（受入）
-          </Link>
+          operable ? (
+            <Link
+              href="/inbound"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700"
+            >
+              <ArrowDownToLine className="h-4 w-4" />
+              入荷（受入）
+            </Link>
+          ) : null
         }
       />
+
+      <ViewOnlySiteNotice companyId={session.companyId} />
 
       {/* 現在の職場 */}
       <div className="mb-4 inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-50 px-3 py-1.5 text-sm font-semibold text-fuchsia-800">

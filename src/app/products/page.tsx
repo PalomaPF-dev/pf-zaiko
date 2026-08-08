@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Package, Plus, Search } from "lucide-react";
+import { BookMarked, Package, Plus, Search } from "lucide-react";
 import { requireAdminPage } from "@/lib/session";
 import { listProducts } from "@/lib/db";
 import PageHeader from "@/components/PageHeader";
@@ -26,7 +26,7 @@ export default async function ProductsPage({
     console.error("[products]", e);
     return (
       <div className="p-4 sm:p-6">
-        <PageHeader title="商品マスタ" />
+        <PageHeader title="品目マスタ" />
         <DbErrorState />
       </div>
     );
@@ -36,16 +36,25 @@ export default async function ProductsPage({
     <div className="p-4 sm:p-6">
       <MasterTabs />
       <PageHeader
-        title="商品マスタ"
-        description="図番・品名・単位・ロットサイズを登録します。入庫・移動の現品票に印字されます。"
+        title="品目マスタ"
+        description="在庫を管理する品目を登録します（図番・品名・単位・ロットサイズは現品票にも印字されます）。資材W/F に登録済みの品目は、品目コードで呼び出して登録できます。"
         action={
-          <Link
-            href="/products/new"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700"
-          >
-            <Plus className="h-4 w-4" />
-            新規登録
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/items"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <BookMarked className="h-4 w-4" />
+              資材W/Fから探す
+            </Link>
+            <Link
+              href="/products/new"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700"
+            >
+              <Plus className="h-4 w-4" />
+              新規登録
+            </Link>
+          </div>
         }
       />
 
@@ -83,11 +92,11 @@ export default async function ProductsPage({
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
           <Package className="mx-auto mb-3 h-8 w-8 text-slate-300" />
           <p className="text-sm text-slate-500">
-            {search || belowOnly ? "該当する商品がありません。" : "商品がまだ登録されていません。"}
+            {search || belowOnly ? "該当する品目がありません。" : "品目がまだ登録されていません。"}
           </p>
           {!search && !belowOnly && (
             <Link href="/products/new" className="mt-3 inline-block text-sm font-medium text-fuchsia-600 hover:underline">
-              最初の商品を登録する
+              最初の品目を登録する
             </Link>
           )}
         </div>

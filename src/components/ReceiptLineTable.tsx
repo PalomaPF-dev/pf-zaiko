@@ -7,7 +7,7 @@ import ConfirmForm from "@/components/ConfirmForm";
 import { deleteReceiptLineAction } from "@/lib/actions";
 import type { ReceiptLineWithMeta } from "@/lib/types";
 
-/** ①入荷 明細テーブル。レ点でラベル発行対象を選び、商品ラベルを発行する。 */
+/** ①入荷 明細テーブル。レ点でラベル発行対象を選び、品目ラベルを発行する。 */
 export default function ReceiptLineTable({
   receiptId,
   lines,
@@ -47,7 +47,7 @@ export default function ReceiptLineTable({
           className="inline-flex items-center gap-1.5 rounded-lg bg-fuchsia-600 px-3 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700 disabled:opacity-50"
         >
           <Tag className="h-4 w-4" />
-          選択した商品ラベルを発行{selected.size > 0 ? `（${selected.size}）` : ""}
+          選択した品目ラベルを発行{selected.size > 0 ? `（${selected.size}）` : ""}
         </button>
       </div>
 
@@ -137,7 +137,7 @@ export default function ReceiptLineTable({
             {lines.length === 0 && (
               <tr>
                 <td colSpan={editable ? 9 : 8} className="px-4 py-8 text-center text-sm text-slate-400">
-                  明細がありません。上のフォームから入荷した商品を追加してください。
+                  明細がありません。上のフォームから入荷した品目を追加してください。
                 </td>
               </tr>
             )}

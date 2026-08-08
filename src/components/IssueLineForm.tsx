@@ -19,7 +19,7 @@ export interface IssueLineLocation {
 const input =
   "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-1 focus:ring-fuchsia-500";
 
-/** 出庫の明細追加フォーム。商品選択で入り数（ロットサイズ）を既定にし、箱数×入り数=合計で出荷予定数を指定。 */
+/** 出庫の明細追加フォーム。品目選択で入り数（ロットサイズ）を既定にし、箱数×入り数=合計で出荷予定数を指定。 */
 export default function IssueLineForm({
   products,
   locations,
@@ -51,7 +51,7 @@ export default function IssueLineForm({
       <input type="hidden" name="productId" value={productId} />
       <div className="grid gap-2 sm:grid-cols-[2fr_1.3fr_1fr]">
         <select value={productId} onChange={(e) => setProductId(e.target.value)} required className={input}>
-          <option value="">商品を選択</option>
+          <option value="">品目を選択</option>
           {products.map((p) => (
             <option key={p.id} value={p.id}>
               {p.drawingNo} {p.name}
@@ -85,7 +85,7 @@ export default function IssueLineForm({
         </button>
       </div>
       <p className="text-xs text-slate-400">
-        ロケを「自動引当」にすると、その商品の在庫が最も多い（棚入れ済み）ロケを引き当てます。未入庫分は引当対象外です。
+        ロケを「自動引当」にすると、その品目の在庫が最も多い（棚入れ済み）ロケを引き当てます。未入庫分は引当対象外です。
       </p>
     </form>
   );

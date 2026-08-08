@@ -27,8 +27,8 @@ const input =
   "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-fuchsia-500 focus:outline-none focus:ring-1 focus:ring-fuchsia-500";
 
 /**
- * ②入庫（棚入れ）。①で貼った商品ラベル（QR=在庫管理キー）をスキャン（または一覧から選択）し、
- * ロケーションを付与して棚入れする。商品ごとに完結・部分入庫や複数ロケ分割にも対応。
+ * ②入庫（棚入れ）。①で貼った品目ラベル（QR=在庫管理キー）をスキャン（または一覧から選択）し、
+ * ロケーションを付与して棚入れする。品目ごとに完結・部分入庫や複数ロケ分割にも対応。
  */
 export default function PutawayForm({
   products,
@@ -74,7 +74,7 @@ export default function PutawayForm({
       if (p) {
         setProductId(p.productId);
         setScanMsg("");
-      } else setScanMsg(`「${r.code}」に該当する未入庫の商品が見つかりません`);
+      } else setScanMsg(`「${r.code}」に該当する未入庫の品目が見つかりません`);
     } else if (scanTarget === "location") {
       const l = locations.find((x) => x.code.toUpperCase() === code);
       if (l) {
@@ -85,7 +85,7 @@ export default function PutawayForm({
     setScanTarget(null);
   }
 
-  // 商品未選択：スキャン or 未入庫一覧から選ぶ
+  // 品目未選択：スキャン or 未入庫一覧から選ぶ
   if (!selected) {
     return (
       <div className="flex flex-col gap-4">
@@ -93,10 +93,10 @@ export default function PutawayForm({
         <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
           <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-slate-700">
             <ScanLine className="h-4 w-4" />
-            商品ラベルをスキャン
+            品目ラベルをスキャン
           </h2>
           <p className="mb-3 text-xs text-slate-500">
-            ①入荷で現品に貼った商品ラベル（QR=在庫管理キー）を読み取ると、その商品の未入庫分を棚入れできます。
+            ①入荷で現品に貼った品目ラベル（QR=在庫管理キー）を読み取ると、その品目の未入庫分を棚入れできます。
           </p>
           <button
             type="button"
@@ -119,10 +119,10 @@ export default function PutawayForm({
         </div>
 
         <div>
-          <div className="mb-2 text-sm font-bold text-slate-700">未入庫の商品（棚入れ待ち）</div>
+          <div className="mb-2 text-sm font-bold text-slate-700">未入庫の品目（棚入れ待ち）</div>
           {products.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-400">
-              棚入れ待ちの商品はありません。
+              棚入れ待ちの品目はありません。
             </div>
           ) : (
             <ul className="flex flex-col gap-2">
@@ -158,7 +158,7 @@ export default function PutawayForm({
     );
   }
 
-  // 商品選択済み：ロケ付与＋数量で棚入れ
+  // 品目選択済み：ロケ付与＋数量で棚入れ
   return (
     <form action={formAction} className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
       <input type="hidden" name="productId" value={productId} />
@@ -174,7 +174,7 @@ export default function PutawayForm({
         className="inline-flex w-fit items-center gap-1 text-sm text-slate-500 hover:text-slate-700"
       >
         <ArrowLeft className="h-4 w-4" />
-        商品を選び直す
+        品目を選び直す
       </button>
 
       <div className="rounded-xl border border-fuchsia-200 bg-fuchsia-50/50 p-3">

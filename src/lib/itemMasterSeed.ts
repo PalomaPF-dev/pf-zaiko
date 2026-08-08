@@ -2,7 +2,7 @@ import { getSql } from "./neon";
 import { ensureSchema } from "./schema";
 import meta from "@/data/item-master-meta.json";
 
-// ===== 品目マスタの事前登録（同梱データ → item_master） =====
+// ===== 資材W/F 品目カタログの事前登録（同梱データ → item_master） =====
 //
 // 資材W/F からエクスポートした品目マスタを src/data/item-master.json に同梱してあり、
 // 会社ごとに1回だけ item_master へ流し込む。取込済みかどうかは item_master_imports.version
@@ -117,8 +117,8 @@ async function importSeed(companyId: string): Promise<number> {
 const inFlight = new Map<string, Promise<number>>();
 
 /**
- * 品目マスタが未取込（または同梱データの版が新しい）なら取り込む。冪等。
- * 品目マスタを読む画面・API の入口で呼び、初回アクセス時に自動で揃うようにする。
+ * 品目カタログが未取込（または同梱データの版が新しい）なら取り込む。冪等。
+ * カタログを読む画面・API の入口で呼び、初回アクセス時に自動で揃うようにする。
  * 取込に失敗しても呼び出し元の画面は落とさない（次のアクセスで再試行される）。
  */
 export async function ensureItemMasterSeeded(companyId: string): Promise<void> {

@@ -28,11 +28,11 @@ export function formatItemCode(code: string): string {
 /**
  * 資材W/F の単位コード → 表示名の対応表。
  *
- * W/F 側の単位コード表（01〜47）はこの品目マスタのエクスポートに含まれていないため、
+ * W/F 側の単位コード表（01〜47）はこの品目カタログのエクスポートに含まれていないため、
  * 既定では空にしてある（推測で単位名を当てると現品票やピッキングリストに誤った単位が
  * 印字されてしまう）。W/F の単位コード表を入手したら、ここへ
  *   "01": "個", "03": "kg", …
- * のように追記すれば、品目マスタ画面と商品登録の初期値に反映される。
+ * のように追記すれば、品目カタログ画面と品目登録の初期値に反映される。
  * 未登録のコードは「単位コード 03」のように、コードのまま表示する。
  */
 export const ITEM_UNIT_LABELS: Record<string, string> = {};
@@ -43,7 +43,7 @@ export function itemUnitLabel(code: string | null): string {
   return ITEM_UNIT_LABELS[code] ?? code;
 }
 
-/** 商品マスタの「単位」欄の初期値。単位名が判明しているときだけ埋める（コードは入れない）。 */
+/** 品目マスタ（products）の「単位」欄の初期値。単位名が判明しているときだけ埋める（コードは入れない）。 */
 export function itemUnitForProduct(code: string | null): string | null {
   if (!code) return null;
   return ITEM_UNIT_LABELS[code] ?? null;

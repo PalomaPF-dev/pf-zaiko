@@ -17,7 +17,7 @@ const MAX_DEMO_COMPANIES = 30;
 /**
  * 使い捨てデモのセッションを用意する。
  * - 3時間以上前の古いデモ会社を清掃
- * - is_demo=true のデモ会社＋デモユーザー＋サンプル商品・ロケ・在庫・受払・棚卸一式を新規作成
+ * - is_demo=true のデモ会社＋デモユーザー＋サンプル品目・ロケ・在庫・受払・棚卸一式を新規作成
  * 実アカウント・本番データには一切影響しない。
  */
 export async function createDemoSession(): Promise<{ email: string; password: string }> {
@@ -92,7 +92,7 @@ async function seedSampleData(sql: any, companyId: string): Promise<void> {
   const locI = await loc(honsha, wInspect, "C", "1", "1", "1");
   const locD = await loc(dai2, wDai2, "D", "1", "1", "1");
 
-  // --- 副資材の商品マスタ（メーカー品番をキーに、図番なし。在庫管理キーは自動採番 ZK＋連番） ---
+  // --- 副資材の品目マスタ（メーカー品番をキーに、図番なし。在庫管理キーは自動採番 ZK＋連番） ---
   let zkSeq = 0;
   const product = async (
     name: string, spec: string | null, unit: string, safety: number | null,
