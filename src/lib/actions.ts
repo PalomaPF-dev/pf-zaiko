@@ -25,12 +25,6 @@ import {
   updateProduct,
   deleteProduct,
   nextStockKey,
-  createSite,
-  updateSite,
-  deleteSite,
-  createWorkplace,
-  updateWorkplace,
-  deleteWorkplace,
   getWorkplace,
   setWorkplaceMapImage,
   setAreaPin,
@@ -776,46 +770,40 @@ export async function updateAllowNegativeAction(fd: FormData): Promise<void> {
 }
 
 // ===== 拠点（工場 / 職場）マスタ =====
+// 工場・職場はポータルの部署設定が唯一の正で、アプリからは追加・編集・削除しない
+// （POST /api/portal-masters が portal_code で突合して同期する）。UI からも操作導線を
+// 外しているが、Server Action は直接呼べるため、サーバー側でも明示的に拒否する。
+const MASTER_READONLY_MESSAGE =
+  "工場・職場はポータルの部署設定と連動しています。追加・変更はポータルの管理画面で行ってください。";
 
-export async function createSiteAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireAdminSession();
-  const name = str(fd, "name");
-  if (name) await createSite(companyId, name);
-  revalidatePath("/sites");
+export async function createSiteAction(_fd: FormData): Promise<void> {
+  await requireAdminSession();
+  throw new Error(MASTER_READONLY_MESSAGE);
 }
 
-export async function updateSiteAction(id: string, fd: FormData): Promise<void> {
-  const { companyId } = await requireAdminSession();
-  const name = str(fd, "name");
-  if (name) await updateSite(companyId, id, name);
-  revalidatePath("/sites");
+export async function updateSiteAction(_id: string, _fd: FormData): Promise<void> {
+  await requireAdminSession();
+  throw new Error(MASTER_READONLY_MESSAGE);
 }
 
-export async function deleteSiteAction(id: string): Promise<void> {
-  const { companyId } = await requireAdminSession();
-  await deleteSite(companyId, id);
-  revalidatePath("/sites");
+export async function deleteSiteAction(_id: string): Promise<void> {
+  await requireAdminSession();
+  throw new Error(MASTER_READONLY_MESSAGE);
 }
 
-export async function createWorkplaceAction(fd: FormData): Promise<void> {
-  const { companyId } = await requireAdminSession();
-  const siteId = str(fd, "siteId");
-  const name = str(fd, "name");
-  if (siteId && name) await createWorkplace(companyId, siteId, name);
-  revalidatePath("/sites");
+export async function createWorkplaceAction(_fd: FormData): Promise<void> {
+  await requireAdminSession();
+  throw new Error(MASTER_READONLY_MESSAGE);
 }
 
-export async function updateWorkplaceAction(id: string, fd: FormData): Promise<void> {
-  const { companyId } = await requireAdminSession();
-  const name = str(fd, "name");
-  if (name) await updateWorkplace(companyId, id, name);
-  revalidatePath("/sites");
+export async function updateWorkplaceAction(_id: string, _fd: FormData): Promise<void> {
+  await requireAdminSession();
+  throw new Error(MASTER_READONLY_MESSAGE);
 }
 
-export async function deleteWorkplaceAction(id: string): Promise<void> {
-  const { companyId } = await requireAdminSession();
-  await deleteWorkplace(companyId, id);
-  revalidatePath("/sites");
+export async function deleteWorkplaceAction(_id: string): Promise<void> {
+  await requireAdminSession();
+  throw new Error(MASTER_READONLY_MESSAGE);
 }
 
 /** ヘッダの職場セレクタ: 現在の職場を Cookie に保存し、全画面を再取得させる。 */

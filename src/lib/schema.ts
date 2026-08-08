@@ -160,6 +160,12 @@ async function buildSchema(): Promise<void> {
       UNIQUE (company_id, name)
     )`);
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS sites_company_idx ON sites(company_id, sort_order)`);
+  // ポータル連携: 工場はポータルの部署設定（kind='factory'）が正。portal_code（部署コード F001 等）で
+  // 突合し、名称変更にも追従する。手動作成の工場は NULL（従来どおり）。
+  await safeDdl(() => sql`ALTER TABLE sites ADD COLUMN IF NOT EXISTS portal_code TEXT`);
+  await safeDdl(() => sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS sites_company_portal_code_uq
+    ON sites(company_id, portal_code) WHERE portal_code IS NOT NULL`);
 
   // 職場（ワークプレイス）。工場削除で CASCADE。副資材在庫の独立単位。
   await safeDdl(() => sql`
@@ -176,6 +182,11 @@ async function buildSchema(): Promise<void> {
   await safeDdl(() => sql`CREATE INDEX IF NOT EXISTS workplaces_site_idx ON workplaces(site_id, sort_order)`);
   // 職場ごとの見取り図（エリアマップ）画像 URL（Blob）。
   await safeDdl(() => sql`ALTER TABLE workplaces ADD COLUMN IF NOT EXISTS map_image_url TEXT`);
+  // ポータル連携: 職場はポータルの職場設定（pf_portal_workplaces）が正。portal_code（職場コード）で突合。
+  await safeDdl(() => sql`ALTER TABLE workplaces ADD COLUMN IF NOT EXISTS portal_code TEXT`);
+  await safeDdl(() => sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS workplaces_company_portal_code_uq
+    ON workplaces(company_id, portal_code) WHERE portal_code IS NOT NULL`);
 
   // 見取り図上のエリア位置ピン（職場×エリア。座標は画像に対する % 0-100）。
   await safeDdl(() => sql`

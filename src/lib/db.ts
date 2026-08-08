@@ -314,6 +314,99 @@ export async function deleteWorkplace(companyId: string, id: string): Promise<vo
   await sql`DELETE FROM workplaces WHERE company_id = ${companyId} AND id = ${id}`;
 }
 
+// ===== ポータル連携: 工場・職場マスタの取り込み =====
+
+export interface PortalFactory { code: string; name: string; sort: number }
+export interface PortalWorkplace { code: string; name: string; factoryCode: string; sort: number }
+
+/**
+ * ポータルから配信された工場・職場マスタを自社の sites / workplaces へ upsert する。
+ * 突合は portal_code（工場=部署コード、職場=職場コード）。初回は portal_code 未設定の
+ * 同名レコードを名前で引き当てて紐付ける（既存の置き場・在庫を保持したまま連携に載せるため）。
+ *
+ * v1 は upsert のみ（作成・改名・並び替え）。ポータルから消えた工場・職場のアプリ側削除は、
+ * 在庫ごと CASCADE 消去する破壊的操作のため行わない。
+ * @returns 反映件数（監査・確認用）
+ */
+export async function syncPortalMasters(
+  companyId: string,
+  factories: PortalFactory[],
+  workplaces: PortalWorkplace[],
+): Promise<{ sites: number; workplaces: number }> {
+  await ensureSchema();
+  const sql = getSql();
+
+  // --- 工場（sites）---
+  const siteIdByCode = new Map<string, string>();
+  for (const f of factories) {
+    // 1) portal_code で既存を探す → あれば名称・並び順を更新
+    const byCode = await sql`
+      SELECT id FROM sites WHERE company_id = ${companyId} AND portal_code = ${f.code} LIMIT 1`;
+    if (byCode[0]) {
+      await sql`
+        UPDATE sites SET name = ${f.name}, sort_order = ${f.sort}, updated_at = NOW()
+        WHERE id = ${byCode[0].id}`;
+      siteIdByCode.set(f.code, byCode[0].id as string);
+      continue;
+    }
+    // 2) 初回突合: portal_code 未設定の同名工場を引き当てて紐付ける（既存データ保持）
+    const byName = await sql`
+      SELECT id FROM sites
+      WHERE company_id = ${companyId} AND portal_code IS NULL AND btrim(name) = btrim(${f.name})
+      LIMIT 1`;
+    if (byName[0]) {
+      await sql`
+        UPDATE sites SET portal_code = ${f.code}, sort_order = ${f.sort}, updated_at = NOW()
+        WHERE id = ${byName[0].id}`;
+      siteIdByCode.set(f.code, byName[0].id as string);
+      continue;
+    }
+    // 3) 新規作成
+    const id = randomUUID();
+    await sql`
+      INSERT INTO sites (id, company_id, name, sort_order, portal_code)
+      VALUES (${id}, ${companyId}, ${f.name}, ${f.sort}, ${f.code})`;
+    siteIdByCode.set(f.code, id);
+  }
+
+  // --- 職場（workplaces）---
+  let wpCount = 0;
+  for (const w of workplaces) {
+    const siteId = siteIdByCode.get(w.factoryCode);
+    if (!siteId) continue; // 親工場が見つからない職場は送られてこない想定だが念のためスキップ
+    const byCode = await sql`
+      SELECT id FROM workplaces WHERE company_id = ${companyId} AND portal_code = ${w.code} LIMIT 1`;
+    if (byCode[0]) {
+      // 親工場の付け替えにも追従する
+      await sql`
+        UPDATE workplaces SET name = ${w.name}, site_id = ${siteId}, sort_order = ${w.sort}
+        WHERE id = ${byCode[0].id}`;
+      wpCount++;
+      continue;
+    }
+    const byName = await sql`
+      SELECT id FROM workplaces
+      WHERE company_id = ${companyId} AND portal_code IS NULL
+        AND site_id = ${siteId} AND btrim(name) = btrim(${w.name})
+      LIMIT 1`;
+    if (byName[0]) {
+      await sql`
+        UPDATE workplaces SET portal_code = ${w.code}, sort_order = ${w.sort}
+        WHERE id = ${byName[0].id}`;
+      wpCount++;
+      continue;
+    }
+    const id = randomUUID();
+    await sql`
+      INSERT INTO workplaces (id, company_id, site_id, name, sort_order, portal_code)
+      VALUES (${id}, ${companyId}, ${siteId}, ${w.name}, ${w.sort}, ${w.code})`;
+    await ensureDefaultLocation(companyId, siteId, id);
+    wpCount++;
+  }
+
+  return { sites: siteIdByCode.size, workplaces: wpCount };
+}
+
 /**
  * 職場の「既定の置き場」を返す（無ければ作成）。副資材は職場単位で在庫を持つため、
  * 操作者にロケ番号を意識させず、職場に1つの置き場を自動用意してそこへ入出庫する。
